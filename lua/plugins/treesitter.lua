@@ -2,21 +2,21 @@
 
 return {
   "nvim-treesitter/nvim-treesitter",
-  branch = "main",
+  lazy = false,
   build = ":TSUpdate",
   config = function()
-    -- `ensure_installed` is not a real nvim-treesitter (main branch) option;
-    -- the actual install API is `.install()` -- see README "Installing parsers"
     require("nvim-treesitter").install({
-      "lua", "c", "cpp", "python", "javascript", "typescript",
-      "html", "css", "json", "bash", "markdown", "vim", "vimdoc",
+      "c", "cpp", "rust", "go", "java", "python",
+      "lua", "json", "html", "css", "bash", "markdown", "vim", "vimdoc",
     })
 
-	vim.api.nvim_create_autocmd("FileType", {
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = {
+        "c", "cpp", "rust", "go", "java", "python",
+        "lua", "json", "html", "css", "bash", "markdown", "vim", "vimdoc",
+      },
       callback = function(args)
-        vim.schedule(function()
-          pcall(vim.treesitter.start, args.buf)
-        end)
+        vim.treesitter.start(args.buf)
       end,
     })
   end,

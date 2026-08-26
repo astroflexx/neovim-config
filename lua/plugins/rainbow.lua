@@ -5,18 +5,12 @@ return {
   "HiPhish/rainbow-delimiters.nvim",
   event = "BufReadPost",
   config = function()
-    local rainbow = require("rainbow-delimiters")
-
-    -- match vscode's bracket pair colors: yellow -> purple -> cyan
+    -- match vscode's bracket pair colors: yellow -> purple -> blue 
     vim.api.nvim_set_hl(0, "RainbowDelimiter1", { fg = "#ffd700" })
     vim.api.nvim_set_hl(0, "RainbowDelimiter2", { fg = "#da70d6" })
     vim.api.nvim_set_hl(0, "RainbowDelimiter3", { fg = "#179fff" })
 
-    local default = require("rainbow-delimiters.default")
-
     require("rainbow-delimiters.setup").setup({
-      strategy = default.strategy,
-      query = default.query,
       highlight = {
         "RainbowDelimiter1",
         "RainbowDelimiter2",

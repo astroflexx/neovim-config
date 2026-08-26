@@ -25,7 +25,7 @@ opt.splitbelow = true
 opt.splitright = true
 opt.clipboard = "unnamedplus"
 opt.undofile = true
-opt.updatetime = 250 -- not very clear what this is used for
+opt.updatetime = 250
 opt.mouse = "a"
 vim.opt.timeoutlen = 200
 
