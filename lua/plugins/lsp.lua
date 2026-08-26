@@ -4,7 +4,16 @@ return {
   "mason-org/mason-lspconfig.nvim",
   lazy = false,
   dependencies = {
-    { "mason-org/mason.nvim", opts = {} },
+    {
+      "mason-org/mason.nvim",
+      config = function()
+        local nvm_node = vim.fn.glob("$HOME/.nvm/versions/node/v*", false, true)
+        if #nvm_node > 0 then
+          vim.env.PATH = nvm_node[#nvm_node] .. "/bin:" .. vim.env.PATH
+        end
+        require("mason").setup()
+      end,
+    },
     "neovim/nvim-lspconfig",
   },
   opts = {
