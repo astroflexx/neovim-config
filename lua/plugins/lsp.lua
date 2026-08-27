@@ -2,7 +2,7 @@
 
 return {
   "mason-org/mason-lspconfig.nvim",
-  lazy = false,
+  event = "VeryLazy",
   dependencies = {
     {
       "mason-org/mason.nvim",

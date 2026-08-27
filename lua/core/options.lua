@@ -3,13 +3,10 @@
 local opt = vim.opt
 
 -- direct port from my .vimrc
-opt.hidden = true
 opt.tabstop = 4
 opt.shiftwidth = 4
 opt.expandtab = true
 opt.number = true
-opt.belloff = "all"
-opt.autoindent = true
 
 -- neovim essentials
 opt.smartindent = true
@@ -27,7 +24,7 @@ opt.clipboard = "unnamedplus"
 opt.undofile = true
 opt.updatetime = 250
 opt.mouse = "a"
-vim.opt.timeoutlen = 200
+opt.timeoutlen = 200
 
 -- cursor and its color
 opt.guicursor = "n-v-o:block-Cursor-blinkon1-blinkoff1-blinkwait1,i-ci-ve:ver25-Cursor-blinkon1-blinkoff1-blinkwait1,r-cr:hor20-Cursor-blinkon1-blinkoff1-blinkwait1"

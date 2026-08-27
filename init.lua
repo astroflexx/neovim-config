@@ -4,6 +4,8 @@
 
 -- anything else, put it in a separate file
 
+vim.loader.enable()
+
 require("core.options")
 require("core.keymaps")
 require("core.autocmds")
