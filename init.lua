@@ -9,6 +9,7 @@ vim.loader.enable()
 require("core.options")
 require("core.keymaps")
 require("core.autocmds")
+require("core.statusline")
 
 -- bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"

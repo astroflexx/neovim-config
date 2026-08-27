@@ -25,6 +25,7 @@ opt.undofile = true
 opt.updatetime = 250
 opt.mouse = "a"
 opt.timeoutlen = 200
+opt.showmode = false
 
 -- cursor and its color
 opt.guicursor = "n-v-o:block-Cursor-blinkon1-blinkoff1-blinkwait1,i-ci-ve:ver25-Cursor-blinkon1-blinkoff1-blinkwait1,r-cr:hor20-Cursor-blinkon1-blinkoff1-blinkwait1"
