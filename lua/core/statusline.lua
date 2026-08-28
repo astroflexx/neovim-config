@@ -44,14 +44,20 @@ local function get_mode()
   return MODE_MAP[mode] or mode:upper()
 end
 
-local function stbufnr()
-  return vim.api.nvim_win_get_buf(vim.g.statusline_winid or 0)
+local function find_editor_buf()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].filetype ~= "NvimTree" then
+      return buf
+    end
+  end
+  return vim.api.nvim_get_current_buf()
 end
 
-local function get_formatter_info()
+local function get_formatter_info(buf)
   local ok, conform = pcall(require, "conform")
   if not ok then return nil end
-  local formatters = conform.list_formatters(0)
+  local formatters = conform.list_formatters(buf)
   if #formatters == 0 then return nil end
   local names = {}
   for _, f in ipairs(formatters) do
@@ -60,8 +66,8 @@ local function get_formatter_info()
   return table.concat(names, ", ")
 end
 
-local function get_lsp_info()
-  local clients = vim.lsp.get_clients({ bufnr = 0 })
+local function get_lsp_info(buf)
+  local clients = vim.lsp.get_clients({ bufnr = buf })
   if #clients == 0 then return nil end
   local names = {}
   for _, client in ipairs(clients) do
@@ -71,16 +77,14 @@ local function get_lsp_info()
 end
 
 function M.render()
-  local buf = stbufnr()
-  local ft = vim.bo[buf].filetype
-  if ft == "NvimTree" then return "" end
+  local buf = find_editor_buf()
 
   local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#"
 
   local sections = {}
-  local fmt = get_formatter_info()
+  local fmt = get_formatter_info(buf)
   if fmt then sections[#sections + 1] = { body = "StFmtBody", sep = "StFmtSep", icon = icon_fmt, text = fmt, color = "Fmt" } end
-  local lsp = get_lsp_info()
+  local lsp = get_lsp_info(buf)
   if lsp then sections[#sections + 1] = { body = "StLspBody", sep = "StLspSep", icon = icon_lsp, text = lsp, color = "Lsp" } end
 
   local right = ""
