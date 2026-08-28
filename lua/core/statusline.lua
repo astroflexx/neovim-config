@@ -84,14 +84,8 @@ function M.render()
     FmtLsp = "StFmtToLsp",
   }
 
-  for i, sec in ipairs(sections) do
-    if i == 1 then
-      right = right .. "%#" .. sec.sep .. "#" .. sep_l
-    else
-      local key = sections[i - 1].color .. sec.color
-      right = right .. "%#" .. transition_map[key] .. "#" .. sep_l
-    end
-    right = right .. "%#" .. sec.body .. "# " .. sec.icon .. " " .. sec.text .. "  "
+  for _, sec in ipairs(sections) do
+    right = right .. "%#" .. sec.body .. "#  " .. sec.icon .. " " .. sec.text .. "  "
   end
 
   return left .. "%=%#StatusLine#" .. right
