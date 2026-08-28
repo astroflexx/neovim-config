@@ -21,6 +21,9 @@ local function setup_highlights()
   vim.api.nvim_set_hl(0, "StatusLine", { fg = "#d4d4d4", bg = "#2d2d2d" })
   vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#808080", bg = "#2d2d2d" })
   vim.api.nvim_set_hl(0, "StMode", { fg = "#1e1e1e", bg = "#569cd6", bold = true })
+  vim.api.nvim_set_hl(0, "StGit", { fg = "#1e1e1e", bg = "#8668c4", bold = true })
+  vim.api.nvim_set_hl(0, "StFormatter", { fg = "#1e1e1e", bg = "#4ec9b0", bold = true })
+  vim.api.nvim_set_hl(0, "StLinter", { fg = "#1e1e1e", bg = "#dcdcaa", bold = true })
   vim.api.nvim_set_hl(0, "StLsp", { fg = "#1e1e1e", bg = "#45b550", bold = true })
 end
 
@@ -29,26 +32,42 @@ local function get_mode()
   return MODE_MAP[mode] or mode:upper()
 end
 
+local function stbufnr()
+  return vim.api.nvim_win_get_buf(vim.g.statusline_winid or 0)
+end
+
 local function get_git()
-  local signs = vim.b.gitsigns_status_dict
-  if not signs then return "" end
+  local bufnr = stbufnr()
+  if not vim.b[bufnr].gitsigns_head then return "" end
 
-  local parts = {}
-  if signs.head and signs.head ~= "" then
-    parts[#parts + 1] = signs.head
-  end
-  if (signs.added or 0) > 0 then
-    parts[#parts + 1] = "+" .. signs.added
-  end
-  if (signs.changed or 0) > 0 then
-    parts[#parts + 1] = "~" .. signs.changed
-  end
-  if (signs.removed or 0) > 0 then
-    parts[#parts + 1] = "-" .. signs.removed
-  end
+  local git_status = vim.b[bufnr].gitsigns_status_dict
 
-  if #parts == 0 then return "" end
-  return "  " .. table.concat(parts, " ")
+  local added = (git_status.added and git_status.added ~= 0) and ("  \u{f067} " .. git_status.added) or ""
+  local changed = (git_status.changed and git_status.changed ~= 0) and ("  \u{f459} " .. git_status.changed) or ""
+  local removed = (git_status.removed and git_status.removed ~= 0) and ("  \u{f068} " .. git_status.removed) or ""
+  local branch_name = "\u{f418} " .. git_status.head
+
+  return "%#StGit#  " .. branch_name .. added .. changed .. removed .. "  %#StatusLine#"
+end
+
+local function get_formatters()
+  local ok, conform = pcall(require, "conform")
+  if not ok then return "" end
+  local formatters = conform.list_formatters(0)
+  if #formatters == 0 then return "" end
+  local names = {}
+  for _, f in ipairs(formatters) do
+    names[#names + 1] = f.name
+  end
+  return "%#StFormatter#  " .. table.concat(names, ", ") .. "  "
+end
+
+local function get_linters()
+  local ok, lint = pcall(require, "lint")
+  if not ok then return "" end
+  local linters = lint.linters_by_ft[vim.bo[stbufnr()].filetype] or {}
+  if #linters == 0 then return "" end
+  return "%#StLinter#  " .. table.concat(linters, ", ") .. "  "
 end
 
 local function get_lsp()
@@ -63,7 +82,8 @@ end
 
 function M.render()
   local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#" .. get_git()
-  return left .. "%=" .. get_lsp()
+  local right = get_formatters() .. get_linters() .. get_lsp()
+  return left .. "%=%#StatusLine#" .. right
 end
 
 setup_highlights()
