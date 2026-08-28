@@ -17,7 +17,7 @@ local MODE_MAP = {
   ["nt"] = "NORMAL",
 }
 
-local red = "#e06c75"
+local teal = "#1a8a7a"
 local green = "#45b550"
 local stl_bg = "#1e1f20"
 
@@ -30,13 +30,13 @@ local function setup_highlights()
   vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#666666", bg = stl_bg })
   vim.api.nvim_set_hl(0, "StMode", { fg = "#000000", bg = "#569cd6", bold = true })
 
-  vim.api.nvim_set_hl(0, "StFmtSep", { fg = red, bg = stl_bg })
-  vim.api.nvim_set_hl(0, "StFmtBody", { fg = "#000000", bg = red, bold = true })
+  vim.api.nvim_set_hl(0, "StFmtSep", { fg = teal, bg = stl_bg })
+  vim.api.nvim_set_hl(0, "StFmtBody", { fg = "#000000", bg = teal, bold = true })
 
   vim.api.nvim_set_hl(0, "StLspSep", { fg = green, bg = stl_bg })
   vim.api.nvim_set_hl(0, "StLspBody", { fg = "#000000", bg = green, bold = true })
 
-  vim.api.nvim_set_hl(0, "StFmtToLsp", { fg = green, bg = red })
+  vim.api.nvim_set_hl(0, "StFmtToLsp", { fg = green, bg = teal })
 end
 
 local function get_mode()
