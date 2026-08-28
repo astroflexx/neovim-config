@@ -20,7 +20,7 @@ opt.ignorecase = true
 opt.smartcase = true
 opt.splitbelow = true
 opt.splitright = true
-opt.clipboard = "unnamedplus"
+-- Don't sync all yanks/deletes with system clipboard; use "+y / "+p explicitly
 opt.undofile = true
 opt.updatetime = 250
 opt.mouse = "a"

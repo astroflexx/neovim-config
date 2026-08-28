@@ -24,8 +24,16 @@ return {
         end,
       },
       { "<leader>w", "<cmd>NvimTreeClose<cr>" },
+      {
+        "<leader>r",
+        function()
+          require("nvim-tree.api").tree.change_root(vim.g.nvim_tree_original_cwd)
+        end,
+        desc = "Reset nvim-tree to original root",
+      },
     },
     config = function()
+      vim.g.nvim_tree_original_cwd = vim.fn.getcwd()
       vim.g.loaded_netrw = 1
       vim.g.loaded_netrwPlugin = 1
       require("nvim-tree").setup({
