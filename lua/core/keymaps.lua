@@ -9,3 +9,5 @@ local map = vim.keymap.set
 map("i", "kj", "<Esc>")
 map("v", "kj", "<Esc>")
 map("c", "kj", "<Esc>")
+
+map("n", "<leader>q", "<cmd>qa<cr>")
