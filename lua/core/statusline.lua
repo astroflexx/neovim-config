@@ -18,13 +18,13 @@ local MODE_MAP = {
 }
 
 local function setup_highlights()
-  vim.api.nvim_set_hl(0, "StatusLine", { fg = "#d4d4d4", bg = "#2d2d2d" })
-  vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#808080", bg = "#2d2d2d" })
-  vim.api.nvim_set_hl(0, "StMode", { fg = "#1e1e1e", bg = "#569cd6", bold = true })
-  vim.api.nvim_set_hl(0, "StGit", { fg = "#1e1e1e", bg = "#8668c4", bold = true })
-  vim.api.nvim_set_hl(0, "StFormatter", { fg = "#1e1e1e", bg = "#4ec9b0", bold = true })
-  vim.api.nvim_set_hl(0, "StLinter", { fg = "#1e1e1e", bg = "#dcdcaa", bold = true })
-  vim.api.nvim_set_hl(0, "StLsp", { fg = "#1e1e1e", bg = "#45b550", bold = true })
+  vim.api.nvim_set_hl(0, "StatusLine", { fg = "#9a9a9a", bg = "#2d2d2d" })
+  vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#666666", bg = "#2d2d2d" })
+  vim.api.nvim_set_hl(0, "StMode", { fg = "#7cb7e8", bg = "#1e3a52", bold = true })
+  vim.api.nvim_set_hl(0, "StGit", { fg = "#b09be0", bg = "#2e2544", bold = true })
+  vim.api.nvim_set_hl(0, "StFormatter", { fg = "#6dc4ab", bg = "#1d3b34", bold = true })
+  vim.api.nvim_set_hl(0, "StLinter", { fg = "#d4c477", bg = "#3a3520", bold = true })
+  vim.api.nvim_set_hl(0, "StLsp", { fg = "#7dbe84", bg = "#1e3522", bold = true })
 end
 
 local function get_mode()
@@ -65,6 +65,8 @@ end
 local function get_linters()
   local ok, lint = pcall(require, "lint")
   if not ok then return "" end
+  local filepath = vim.api.nvim_buf_get_name(stbufnr())
+  if filepath:find(vim.fn.expand("$HOME") .. "/test", 1, true) then return "" end
   local linters = lint.linters_by_ft[vim.bo[stbufnr()].filetype] or {}
   if #linters == 0 then return "" end
   return "%#StLinter#  " .. table.concat(linters, ", ") .. "  "
