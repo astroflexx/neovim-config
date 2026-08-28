@@ -21,7 +21,6 @@ local function setup_highlights()
   vim.api.nvim_set_hl(0, "StatusLine", { fg = "#9a9a9a", bg = "#2d2d2d" })
   vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#666666", bg = "#2d2d2d" })
   vim.api.nvim_set_hl(0, "StMode", { fg = "#7cb7e8", bg = "#1e3a52", bold = true })
-  vim.api.nvim_set_hl(0, "StGit", { fg = "#b09be0", bg = "#2e2544", bold = true })
   vim.api.nvim_set_hl(0, "StFormatter", { fg = "#6dc4ab", bg = "#1d3b34", bold = true })
   vim.api.nvim_set_hl(0, "StLinter", { fg = "#d4c477", bg = "#3a3520", bold = true })
   vim.api.nvim_set_hl(0, "StLsp", { fg = "#7dbe84", bg = "#1e3522", bold = true })
@@ -34,20 +33,6 @@ end
 
 local function stbufnr()
   return vim.api.nvim_win_get_buf(vim.g.statusline_winid or 0)
-end
-
-local function get_git()
-  local bufnr = stbufnr()
-  if not vim.b[bufnr].gitsigns_head then return "" end
-
-  local git_status = vim.b[bufnr].gitsigns_status_dict
-
-  local added = (git_status.added and git_status.added ~= 0) and ("  \u{f067} " .. git_status.added) or ""
-  local changed = (git_status.changed and git_status.changed ~= 0) and ("  \u{f459} " .. git_status.changed) or ""
-  local removed = (git_status.removed and git_status.removed ~= 0) and ("  \u{f068} " .. git_status.removed) or ""
-  local branch_name = "\u{f418} " .. git_status.head
-
-  return "%#StGit#  " .. branch_name .. added .. changed .. removed .. "  %#StatusLine#"
 end
 
 local function get_formatters()
@@ -83,7 +68,7 @@ local function get_lsp()
 end
 
 function M.render()
-  local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#" .. get_git()
+  local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#"
   local right = get_formatters() .. get_linters() .. get_lsp()
   return left .. "%=%#StatusLine#" .. right
 end
@@ -95,13 +80,6 @@ local st_group = vim.api.nvim_create_augroup("StatuslineAu", { clear = true })
 vim.api.nvim_create_autocmd({ "ColorScheme", "VimEnter" }, {
   group = st_group,
   callback = setup_highlights,
-})
-vim.api.nvim_create_autocmd("User", {
-  group = st_group,
-  pattern = "GitSignsUpdate",
-  callback = function()
-    vim.schedule(function() vim.cmd.redrawstatus() end)
-  end,
 })
 vim.api.nvim_create_autocmd({ "LspAttach", "LspDetach" }, {
   group = st_group,

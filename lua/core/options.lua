@@ -24,7 +24,7 @@ opt.clipboard = "unnamedplus"
 opt.undofile = true
 opt.updatetime = 250
 opt.mouse = "a"
-opt.timeoutlen = 200
+opt.timeoutlen = 400
 opt.showmode = false
 
 -- cursor and its color
