@@ -20,6 +20,7 @@ local MODE_MAP = {
 local function setup_highlights()
   vim.api.nvim_set_hl(0, "StatusLine", { fg = "#d4d4d4", bg = "#2d2d2d" })
   vim.api.nvim_set_hl(0, "StatusLineNC", { fg = "#808080", bg = "#2d2d2d" })
+  vim.api.nvim_set_hl(0, "StMode", { fg = "#1e1e1e", bg = "#569cd6", bold = true })
   vim.api.nvim_set_hl(0, "StLsp", { fg = "#1e1e1e", bg = "#569cd6", bold = true })
 end
 
@@ -61,7 +62,7 @@ local function get_lsp()
 end
 
 function M.render()
-  local left = "   " .. get_mode() .. " " .. get_git()
+  local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#" .. get_git()
   return left .. "%=" .. get_lsp()
 end
 
