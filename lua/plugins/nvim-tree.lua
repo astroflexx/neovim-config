@@ -37,6 +37,24 @@ return {
         },
       })
 
+      local original_guicursor = vim.o.guicursor
+      vim.api.nvim_set_hl(0, "NvimTreeHiddenCursor", { blend = 100, nocombine = true })
+
+      local function apply_cursor()
+        vim.schedule(function()
+          if not vim.api.nvim_buf_is_valid(0) then return end
+          if vim.bo.filetype == "NvimTree" then
+            vim.o.guicursor = "a:NvimTreeHiddenCursor"
+          else
+            vim.o.guicursor = original_guicursor
+          end
+        end)
+      end
+
+      vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
+        callback = apply_cursor,
+      })
+
       vim.api.nvim_create_autocmd("VimEnter", {
         callback = function(data)
           local directory = vim.fn.isdirectory(data.file) == 1
