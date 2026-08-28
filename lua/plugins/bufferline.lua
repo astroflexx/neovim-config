@@ -52,6 +52,35 @@ return {
     end
 
     fix_bufferline_hls()
+
+    local map = vim.keymap.set
+    local function listed_bufs()
+      local bufs = {}
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.bo[b].buflisted then bufs[#bufs + 1] = b end
+      end
+      return bufs
+    end
+
+    map("n", "<leader>h", function()
+      local bufs = listed_bufs()
+      if vim.api.nvim_get_current_buf() ~= bufs[1] then
+        vim.cmd("BufferLineCyclePrev")
+      end
+    end, { desc = "Previous buffer" })
+
+    map("n", "<leader>l", function()
+      local bufs = listed_bufs()
+      if vim.api.nvim_get_current_buf() ~= bufs[#bufs] then
+        vim.cmd("BufferLineCycleNext")
+      end
+    end, { desc = "Next buffer" })
+    for i = 1, 9 do
+      map("n", "<leader>" .. i, function()
+        require("bufferline").go_to(i, true)
+      end, { desc = "Go to buffer " .. i })
+    end
+
     vim.api.nvim_create_autocmd({ "ColorScheme", "BufAdd" }, {
       callback = function()
         vim.defer_fn(fix_bufferline_hls, 100)
