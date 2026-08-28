@@ -71,6 +71,10 @@ local function get_lsp_info()
 end
 
 function M.render()
+  local buf = stbufnr()
+  local ft = vim.bo[buf].filetype
+  if ft == "NvimTree" then return "" end
+
   local left = "%#StMode#  " .. get_mode() .. "  %#StatusLine#"
 
   local sections = {}
