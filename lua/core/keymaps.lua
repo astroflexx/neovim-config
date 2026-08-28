@@ -30,14 +30,19 @@ map("n", "<leader>x", function()
         break
       end
     end
-    vim.cmd("bd")
+    local buf_to_delete = vim.api.nvim_get_current_buf()
+    vim.cmd("bprevious")
+    if vim.api.nvim_get_current_buf() == buf_to_delete then
+      vim.cmd("enew")
+    end
+    vim.cmd("bdelete " .. buf_to_delete)
     local bufs = vim.tbl_filter(function(b)
       return vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buflisted
     end, vim.api.nvim_list_bufs())
     local only_empty = #bufs == 0 or (#bufs == 1 and vim.api.nvim_buf_get_name(bufs[1]) == "" and not vim.bo[bufs[1]].modified)
     if only_empty and tree_open then
       vim.cmd("NvimTreeFocus")
-      if #bufs == 1 then vim.cmd("bd " .. bufs[1]) end
+      if #bufs == 1 then vim.cmd("bdelete " .. bufs[1]) end
     elseif only_empty then
       vim.cmd("qa")
     end
