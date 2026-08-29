@@ -17,6 +17,7 @@ map("n", "<leader>gd", "<C-]>")
 map("n", "<leader>gs", "<C-w>]")
 map("n", "<leader>gp", "<C-w>}")
 map("n", "<leader>d", vim.diagnostic.open_float)
+map("n", "<leader>s", vim.lsp.buf.signature_help)
 map("n", "<leader>x", function()
   local bt = vim.bo.buftype
   local ft = vim.bo.filetype

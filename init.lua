@@ -5,6 +5,7 @@
 -- anything else, put it in a separate file
 
 vim.loader.enable()
+vim.fn.system("stty -ixon")
 
 require("core.options")
 require("core.keymaps")

@@ -16,8 +16,8 @@ return {
     },
     "neovim/nvim-lspconfig",
   },
-  opts = {
-    ensure_installed = {
+  config = function(_, opts)
+    opts.ensure_installed = {
       "clangd",
       "rust_analyzer",
       "gopls",
@@ -28,6 +28,18 @@ return {
       "html",
       "cssls",
       "bashls",
-    },
-  },
+    }
+
+    local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+    opts.handlers = {
+      function(server_name)
+        require("lspconfig")[server_name].setup({
+          capabilities = capabilities,
+        })
+      end,
+    }
+
+    require("mason-lspconfig").setup(opts)
+  end,
 }
