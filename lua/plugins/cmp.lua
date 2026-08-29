@@ -115,5 +115,41 @@ return {
         end
       end
     end
+
+    -- nvim-cmp only re-queries completion when the cursor moves exactly one
+    -- column forward (the `lp[2] + 1 == pos[2]` guard in its TextChangedI
+    -- handler, nvim-cmp/lua/cmp/init.lua). So deleting text never refreshes the
+    -- menu: backspacing from "cin" back to "c" keeps the stale "cin" list, and
+    -- clearing the keyword leaves the menu open. Re-run completion ourselves on
+    -- any insert-mode deletion, and dismiss the menu once no keyword remains.
+    local last_line = {}
+    vim.api.nvim_create_autocmd({ "InsertEnter", "TextChangedI", "InsertLeave" }, {
+      group = vim.api.nvim_create_augroup("cmp_refresh_on_delete", { clear = true }),
+      callback = function(args)
+        if args.event == "InsertLeave" then
+          last_line[args.buf] = nil
+          return
+        end
+
+        local line = vim.api.nvim_get_current_line()
+        local prev = last_line[args.buf]
+        last_line[args.buf] = line
+
+        if args.event == "InsertEnter" or not prev or #line >= #prev then
+          return -- typing forward / no deletion; nvim-cmp handles it
+        end
+
+        local col = vim.fn.col(".") - 1
+        local char = col > 0 and line:sub(col, col) or ""
+        if char:match("[%w_]") then
+          -- Manual reason forces a fresh source request (Auto is a no-op here
+          -- when the source already returned a complete list for the longer
+          -- prefix, e.g. clangd for "null" -> stale on backspace to "nul").
+          cmp.complete({ reason = cmp.ContextReason.Manual })
+        elseif cmp.visible() then
+          cmp.close()
+        end
+      end,
+    })
   end,
 }
