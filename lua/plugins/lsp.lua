@@ -32,14 +32,31 @@ return {
 
     local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
-    opts.handlers = {
-      function(server_name)
-        require("lspconfig")[server_name].setup({
-          capabilities = capabilities,
-        })
-      end,
-    }
+    -- Tell every server "I don't support snippets", so completion items come
+    -- back as plain text instead of placeholder templates. This is what turns
+    -- clangd's `vector<${1:typename Tp}>` (the `vector~` template entry in the
+    -- menu) into a plain `vector` that just inserts the identifier, matching
+    -- VSCode's default C++ IntelliSense behaviour.
+    capabilities.textDocument.completion.completionItem.snippetSupport = false
 
-    require("mason-lspconfig").setup(opts)
+    -- mason-lspconfig 2.x has no `handlers` / `setup_handlers`: it just calls
+    -- `vim.lsp.enable()` for every installed server, pulling per-server config
+    -- from `vim.lsp.config()`. So register config there.
+    vim.lsp.config("*", { capabilities = capabilities })
+
+    vim.lsp.config("clangd", {
+      capabilities = capabilities,
+      cmd = {
+        "clangd",
+        -- Don't insert `(` / argument placeholders when completing a function;
+        -- just the name. Belt-and-braces with snippetSupport=false.
+        "--function-arg-placeholders=false",
+        -- Never auto-add `#include` lines on completion; headers are added by hand.
+        "--header-insertion=never",
+        "--completion-style=detailed",
+      },
+    })
+
+    require("mason-lspconfig").setup({ ensure_installed = opts.ensure_installed })
   end,
 }
