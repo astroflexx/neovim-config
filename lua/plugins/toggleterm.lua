@@ -1,18 +1,70 @@
+-- vscode's bottom panel, reproduced as an *overlay*.
+--
+-- a split terminal has to steal its rows from somebody: opening one shrinks the
+-- editor and shifts every line of the file up. a floating window is the only
+-- layout that doesn't - it is drawn on top of the tree and the editor, which
+-- keep the exact geometry they had before the toggle - so this terminal is a
+-- float pinned to the bottom of the screen rather than a horizontal split.
+--
+-- the geometry below is measured off vscode's panel at the same window size.
+
+-- share of the screen the panel covers (vscode: a little over half). a ratio
+-- rather than a fixed row count, so the panel keeps its proportions if the font
+-- size or the window changes.
+local PANEL_RATIO = 0.54
+
+-- columns owned by the file tree, including the separator column to its right;
+-- the panel starts after them so the tree stays fully visible, like vscode's
+-- explorer. 0 when the tree is closed - the panel then spans the full width.
+local function tree_columns()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == "NvimTree" then
+      return vim.api.nvim_win_get_width(win) + 1
+    end
+  end
+  return 0
+end
+
+local function panel_height()
+  return math.floor(vim.o.lines * PANEL_RATIO + 0.5)
+end
+
+-- first screen row the window area no longer owns: the command line, plus the
+-- global statusline (laststatus = 3, see core/options.lua). the panel's bottom
+-- edge sits here, so the statusline stays visible underneath it.
+local function panel_bottom()
+  return vim.o.lines - vim.o.cmdheight - (vim.o.laststatus == 3 and 1 or 0)
+end
+
+-- the top edge is a one row border drawn in WinSeparator, so the panel is
+-- divided off exactly like the horizontal split used to be. `row` is the outer
+-- edge - the border sits *on* it and the content starts below - so the height
+-- gives that row back, keeping the panel the same size as it is without one.
+local TOP_BORDER = { "", "\u{2500}", "", "", "", "", "", "" }
+
 return {
   "akinsho/toggleterm.nvim",
   version = "*",
   keys = {
-    { [[<C-\>]], desc = "Toggle horizontal terminal" },
-    { "<leader>t", "<cmd>ToggleTerm<cr>", desc = "Toggle terminal" },
+    { [[<C-\>]], desc = "Toggle terminal panel" },
+    { "<leader>t", "<cmd>ToggleTerm<cr>", desc = "Toggle terminal panel" },
   },
   cmd = { "ToggleTerm", "TermExec" },
   config = function()
     require("toggleterm").setup({
-      -- vscode-style bottom panel
       open_mapping = [[<C-\>]],
-      direction = "horizontal",
-      size = 15,
-      persist_size = true,
+      direction = "float",
+      -- width/height/row/col accept a function, re-evaluated on every open and
+      -- on VimResized, which is what lets the panel track the tree's width.
+      float_opts = {
+        border = TOP_BORDER,
+        height = function() return panel_height() - 1 end,
+        width = function() return vim.o.columns - tree_columns() end,
+        row = function() return panel_bottom() - panel_height() end,
+        col = tree_columns,
+      },
+      -- same colour the split separator had, so the seam looks unchanged
+      highlights = { FloatBorder = { link = "WinSeparator" } },
       persist_mode = true,
       insert_mappings = true,
       terminal_mappings = true,
@@ -20,25 +72,11 @@ return {
       close_on_exit = true,
       auto_scroll = true,
       shade_terminals = false,
-      -- keep the nvim-tree sidebar full-height (vscode-style): the terminal
-      -- spans only the editor width, not the whole screen bottom.
       on_open = function(term)
-        -- runs on every toggle (TermOpen only fires once per buffer)
+        -- every toggle builds a brand new floating window, so window-local
+        -- options have to be re-applied here rather than once at TermOpen.
         vim.wo[term.window].scrolloff = 0
         vim.wo[term.window].sidescrolloff = 0
-
-        for _, win in ipairs(vim.api.nvim_list_wins()) do
-          local buf = vim.api.nvim_win_get_buf(win)
-          if vim.bo[buf].filetype == "NvimTree" then
-            -- nvim_win_call (not set_current_win) so we never leave the terminal
-            -- window - otherwise the terminal drops out of insert mode and the
-            -- cursor lands on the last blank line on a fresh open.
-            local width = vim.api.nvim_win_get_width(win)
-            vim.api.nvim_win_call(win, function() vim.cmd("wincmd H") end)
-            vim.api.nvim_win_set_width(win, width)
-            break
-          end
-        end
       end,
     })
 
@@ -58,9 +96,6 @@ return {
     -- make terminal windows behave like an editor pane:
     -- kj to normal mode, <C-h/j/k/l> to move between windows
     local function set_terminal_keymaps()
-      vim.wo.scrolloff = 0
-      vim.wo.sidescrolloff = 0
-
       local opts = { buffer = 0 }
       vim.keymap.set("t", "kj", [[<C-\><C-n>]], opts)
       vim.keymap.set("t", "<C-h>", [[<Cmd>wincmd h<CR>]], opts)

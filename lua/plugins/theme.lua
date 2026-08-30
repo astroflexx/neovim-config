@@ -18,6 +18,11 @@ return {
       })
       require("vscode").load()
 
+      -- every 'guicursor' mode points at this group (see core/options.lua).
+      -- has to be set after load(), which does `hi clear`. only bg is used in
+      -- the TUI - guifg is ignored there, the terminal picks the text color.
+      vim.api.nvim_set_hl(0, "Cursor", { fg = "#000000", bg = "#a0a0a0" })
+
       -- treesitter and lsp token colors to match vscode
 
       vim.api.nvim_set_hl(0, "@keyword", { fg = "#c586c0" })

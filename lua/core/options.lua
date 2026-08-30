@@ -28,6 +28,19 @@ opt.timeoutlen = 400
 opt.showmode = false
 opt.laststatus = 3
 
--- cursor and its color
-opt.guicursor = "n-v-o:block-Cursor-blinkon1-blinkoff1-blinkwait1,i-ci-ve:ver25-Cursor-blinkon1-blinkoff1-blinkwait1,r-cr:hor20-Cursor-blinkon1-blinkoff1-blinkwait1"
-vim.api.nvim_set_hl(0, "Cursor", { fg = "#000000", bg = "#a0a0a0" })
+-- cursor shape per mode; the trailing "a:" entry gives *every* mode - terminal
+-- and command-line included - the same color and blink.
+--
+-- naming Cursor for all modes matters: any mode left out of 'guicursor' keeps
+-- neovim's default entry, and the defaults for t/c/sm carry either no highlight
+-- group or TermCursor (reverse video, no colors of its own). The TUI reads both
+-- as "use the host terminal's cursor color" and emits OSC 112, so alacritty's
+-- [colors.cursor] #ffffff took over - a glaring white block in terminal mode.
+opt.guicursor = table.concat({
+  "n-v-o-t:block",
+  "i-ci-ve:ver25",
+  "r-cr:hor20",
+  "a:Cursor-blinkwait1-blinkon1-blinkoff1",
+}, ",")
+-- the Cursor highlight itself is defined in plugins/theme.lua: the colorscheme
+-- runs `hi clear` when it loads, which would wipe anything set here.
