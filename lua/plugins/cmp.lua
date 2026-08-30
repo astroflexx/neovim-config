@@ -101,6 +101,14 @@ return {
       formatting = {
         fields = { "kind", "abbr" },
         format = function(entry, vim_item)
+          -- clangd delivers language constructs like `decltype~`, `static_cast~`,
+          -- `dynamic_cast~` as CompletionItemKind.Snippet (they end in `~`). With
+          -- snippetSupport=false they insert as plain text -- effectively keywords
+          -- -- so relabel them "Keyword" in the menu instead of "Snippet".
+          if vim_item.kind == "Snippet" then
+            vim_item.kind = "Keyword"
+          end
+
           local kind_text = vim_item.kind
           vim_item.kind = " " .. (lspkind.symbol_map[vim_item.kind] or "")
 
@@ -111,7 +119,9 @@ return {
             detail = kind_text
           end
 
-          local name = vim_item.abbr
+          -- clangd suffixes its keyword-pattern entries with `~` (decltype~,
+          -- static_cast~, ...). Drop it from the displayed label.
+          local name = (vim_item.abbr or ""):gsub("~$", "")
           local total = 38
           local max_name = 18
           local max_detail = 18
