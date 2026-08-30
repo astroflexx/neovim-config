@@ -53,7 +53,9 @@ return {
         "--function-arg-placeholders=false",
         -- Never auto-add `#include` lines on completion; headers are added by hand.
         "--header-insertion=never",
-        "--completion-style=detailed",
+        -- Combine overloads (e.g. every vector constructor) into ONE menu entry.
+        -- `detailed` is what exploded `vec` into 10 identical "vector" rows.
+        "--completion-style=bundled",
       },
     })
 

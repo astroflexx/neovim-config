@@ -9,7 +9,26 @@ return {
   },
   config = function()
     local cmp = require("cmp")
+    local compare = require("cmp.config.compare")
     local lspkind = require("lspkind")
+    local KIND = require("cmp.types").lsp.CompletionItemKind
+
+    -- Keep the LSP menu predictable: for a given prefix it should always show
+    -- the same rows. clangd (with <bits/stdc++.h> in scope) also offers
+    --   * Constructor entries  -> "vector  [12 overloads]"
+    --   * libstdc++ internals  -> "_Vector_base", "__normal_iterator", ...
+    -- which duplicate / clutter the real `vector` Class entry. Drop both.
+    local function lsp_entry_filter(entry)
+      local item = entry.completion_item
+      local label = (item.label or ""):gsub("^%s+", "")
+      if item.kind == KIND.Constructor then
+        return false
+      end
+      if label:match("^__") or label:match("^_%u") then
+        return false
+      end
+      return true
+    end
 
     vim.api.nvim_set_hl(0, "CmpNormal", { bg = "#252526", fg = "#d4d4d4" })
     vim.api.nvim_set_hl(0, "CmpSelection", { bg = "#094771", fg = "#ffffff" })
@@ -40,11 +59,28 @@ return {
         ["<C-e>"] = cmp.mapping.abort(),
       }),
       sources = cmp.config.sources({
-        { name = "nvim_lsp" },
+        { name = "nvim_lsp", entry_filter = lsp_entry_filter },
       }, {
         { name = "buffer" },
         { name = "path" },
       }),
+      -- Deterministic ordering: the menu for a given prefix looks the same
+      -- every time. nvim-cmp's default `comparators` include `recently_used`
+      -- and `locality`, which reorder entries based on what you picked before
+      -- / what's near the cursor -- that's why `pmr::vector` floats to the top
+      -- after one use. Drop both; rank purely on the match itself.
+      sorting = {
+        priority_weight = 2,
+        comparators = {
+          compare.offset,
+          compare.exact,
+          compare.score,
+          compare.kind,
+          compare.sort_text,
+          compare.length,
+          compare.order,
+        },
+      },
       completion = {
         completeopt = "menu,menuone,noinsert",
       },
