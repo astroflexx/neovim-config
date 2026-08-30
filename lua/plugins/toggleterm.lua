@@ -30,12 +30,12 @@ return {
         for _, win in ipairs(vim.api.nvim_list_wins()) do
           local buf = vim.api.nvim_win_get_buf(win)
           if vim.bo[buf].filetype == "NvimTree" then
-            local cur = vim.api.nvim_get_current_win()
+            -- nvim_win_call (not set_current_win) so we never leave the terminal
+            -- window - otherwise the terminal drops out of insert mode and the
+            -- cursor lands on the last blank line on a fresh open.
             local width = vim.api.nvim_win_get_width(win)
-            vim.api.nvim_set_current_win(win)
-            vim.cmd("wincmd H")
+            vim.api.nvim_win_call(win, function() vim.cmd("wincmd H") end)
             vim.api.nvim_win_set_width(win, width)
-            vim.api.nvim_set_current_win(cur)
             break
           end
         end
