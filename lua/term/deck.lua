@@ -2,9 +2,13 @@
 -- shells, presented as tabs along the top border.
 --
 --   <leader>p        show / hide the deck (shells keep running while hidden)
---   gt / gT          next / previous tab   ({count}gt jumps to tab {count})
---   <C-t>            new tab
+--   <leader>n        new tab
+--   <leader>h / l    previous / next tab      (also gt / gT; {count}gt jumps)
+--   <leader>1..9     jump to tab N
 --   <leader>x        close + kill the current tab (guarded if it is busy)
+--
+-- The tab keys mirror the bufferline bindings (h/l/1-9) so switching between
+-- code buffers and terminal tabs feels the same.
 --
 -- The deck is for long-running work: hiding it with <leader>p leaves every
 -- shell alive with its scrollback intact. A shell only dies when its tab is
@@ -58,9 +62,14 @@ end
 -- matching the panel's style and keeping the shell's own keys untouched.
 local function set_keymaps(bufnr)
   local opts = { buffer = bufnr, silent = true }
+  vim.keymap.set("n", "<leader>n", function() M.new_tab() end, opts)
+  vim.keymap.set("n", "<leader>l", function() M.next() end, opts)
+  vim.keymap.set("n", "<leader>h", function() M.prev() end, opts)
   vim.keymap.set("n", "gt", function() M.next(vim.v.count) end, opts)
   vim.keymap.set("n", "gT", function() M.prev() end, opts)
-  vim.keymap.set("n", "<C-t>", function() M.new_tab() end, opts)
+  for i = 1, 9 do
+    vim.keymap.set("n", "<leader>" .. i, function() M.go(i) end, opts)
+  end
   vim.keymap.set("n", "<leader>x", function() M.close_tab() end, opts)
   -- <C-\> hides the deck too, so the panel key never opens the panel on top of it
   vim.keymap.set({ "n", "t" }, [[<C-\>]], function() M.toggle() end, opts)
@@ -149,20 +158,21 @@ function M.toggle()
   show(current)
 end
 
---- Next tab, or jump straight to tab `count` when given (so `{count}gt` works).
-function M.next(count)
-  if #tabs == 0 then return end
-  if count and count > 0 then
-    if tabs[count] then show(count) end
-    return
-  end
-  show(current % #tabs + 1)
+--- Jump to tab `idx`; a no-op if it is out of range (matches bufferline).
+function M.go(idx)
+  if tabs[idx] then show(idx) end
 end
 
---- Previous tab.
+--- Next tab, stopping at the last, or jump to tab `count` when given (so
+--- `{count}gt` works). Non-wrapping, like the bufferline h/l keys.
+function M.next(count)
+  if count and count > 0 then return M.go(count) end
+  if current < #tabs then show(current + 1) end
+end
+
+--- Previous tab, stopping at the first.
 function M.prev()
-  if #tabs == 0 then return end
-  show((current - 2) % #tabs + 1)
+  if current > 1 then show(current - 1) end
 end
 
 --- New shell, inserted just after the current tab and focused.
