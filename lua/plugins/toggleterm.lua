@@ -36,11 +36,22 @@ local function panel_bottom()
   return vim.o.lines - vim.o.cmdheight - (vim.o.laststatus == 3 and 1 or 0)
 end
 
--- the top edge is a one row border drawn in WinSeparator, so the panel is
--- divided off exactly like the horizontal split used to be. `row` is the outer
--- edge - the border sits *on* it and the content starts below - so the height
--- gives that row back, keeping the panel the same size as it is without one.
-local TOP_BORDER = { "", "\u{2500}", "", "", "", "", "", "" }
+-- the panel's outer top row, and the rows left for the terminal below it
+local function panel_row() return panel_bottom() - panel_height() end
+local function panel_rows() return panel_height() - 1 end
+
+-- the panel's edges, drawn in WinSeparator so the seam looks exactly like the
+-- horizontal split's did. `row`/`col` are the *outer* edge - the border sits on
+-- them and the content starts one cell in - so the height gives that row back,
+-- keeping the panel the same size it is without a border.
+--
+-- the left edge is the interesting one: it lands on the tree's own separator
+-- column, continuing that line down and meeting the top edge in a proper join
+-- rather than leaving a notch between the two. with no tree there is no line to
+-- meet, and nvim clamps the overhanging column onto column 0 instead of letting
+-- it fall off screen, so that case uses a plain top edge (see on_open).
+local BORDER_JOINED = { "\u{251c}", "\u{2500}", "", "", "", "", "", "\u{2502}" }
+local BORDER_TOP_ONLY = { "", "\u{2500}", "", "", "", "", "", "" }
 
 return {
   "akinsho/toggleterm.nvim",
@@ -57,11 +68,11 @@ return {
       -- width/height/row/col accept a function, re-evaluated on every open and
       -- on VimResized, which is what lets the panel track the tree's width.
       float_opts = {
-        border = TOP_BORDER,
-        height = function() return panel_height() - 1 end,
+        border = BORDER_JOINED,
+        height = panel_rows,
         width = function() return vim.o.columns - tree_columns() end,
-        row = function() return panel_bottom() - panel_height() end,
-        col = tree_columns,
+        row = panel_row,
+        col = function() return tree_columns() - 1 end,
       },
       -- same colour the split separator had, so the seam looks unchanged
       highlights = { FloatBorder = { link = "WinSeparator" } },
@@ -77,6 +88,19 @@ return {
         -- options have to be re-applied here rather than once at TermOpen.
         vim.wo[term.window].scrolloff = 0
         vim.wo[term.window].sidescrolloff = 0
+
+        -- no tree, no separator to join: drop the left edge and take back the
+        -- column nvim clamped it into.
+        if tree_columns() == 0 then
+          vim.api.nvim_win_set_config(term.window, {
+            relative = "editor",
+            border = BORDER_TOP_ONLY,
+            row = panel_row(),
+            col = 0,
+            width = vim.o.columns,
+            height = panel_rows(),
+          })
+        end
       end,
     })
 
