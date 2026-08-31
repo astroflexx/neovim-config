@@ -62,6 +62,8 @@ local function set_keymaps(bufnr)
   vim.keymap.set("n", "gT", function() M.prev() end, opts)
   vim.keymap.set("n", "<C-t>", function() M.new_tab() end, opts)
   vim.keymap.set("n", "<leader>x", function() M.close_tab() end, opts)
+  -- <C-\> hides the deck too, so the panel key never opens the panel on top of it
+  vim.keymap.set({ "n", "t" }, [[<C-\>]], function() M.toggle() end, opts)
 end
 
 local function new_term()
@@ -69,6 +71,9 @@ local function new_term()
   return require("toggleterm.terminal").Terminal:new({
     id = next_id,
     direction = "float",
+    -- kept out of toggleterm's own toggle/list heuristics; the deck drives
+    -- these terminals directly by object reference.
+    hidden = true,
     -- explicit centred geometry: without row/col the panel's bottom-strip
     -- coordinates would leak in through toggleterm's config merge.
     float_opts = {

@@ -56,9 +56,12 @@ local BORDER_TOP_ONLY = { "", "\u{2500}", "", "", "", "", "", "" }
 return {
   "akinsho/toggleterm.nvim",
   version = "*",
+  -- Both panel keys target terminal 1 explicitly (`1ToggleTerm`) rather than
+  -- the bare `:ToggleTerm`, whose "toggle the first terminal" heuristic would
+  -- otherwise latch onto a deck terminal once one exists.
   keys = {
-    { [[<C-\>]], desc = "Toggle terminal panel" },
-    { "<leader>t", "<cmd>ToggleTerm<cr>", desc = "Toggle terminal panel (kill when focused)" },
+    { [[<C-\>]], [[<cmd>1ToggleTerm<cr>]], mode = { "n", "t" }, desc = "Toggle terminal panel" },
+    { "<leader>t", [[<cmd>1ToggleTerm<cr>]], desc = "Toggle terminal panel (kill when focused)" },
     { "<leader>p", function() require("term.deck").toggle() end, desc = "Toggle terminal deck" },
   },
   cmd = { "ToggleTerm", "TermExec" },
@@ -67,7 +70,6 @@ return {
     local guard = require("term.guard")
 
     require("toggleterm").setup({
-      open_mapping = [[<C-\>]],
       direction = "float",
       -- width/height/row/col accept a function, re-evaluated on every open and
       -- on VimResized, which is what lets the panel track the tree's width.
@@ -81,8 +83,6 @@ return {
       -- same colour the split separator had, so the seam looks unchanged
       highlights = { FloatBorder = { link = "WinSeparator" } },
       persist_mode = true,
-      insert_mappings = true,
-      terminal_mappings = true,
       start_in_insert = true,
       close_on_exit = true,
       auto_scroll = true,
