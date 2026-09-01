@@ -9,10 +9,18 @@ return {
         separator_style = { "│", "│" },
         modified_icon = "󰅖",
         buffer_close_icon = "󰅖",
+        -- reserve the left column so the buffer tabs stay put instead of
+        -- sliding right when nvim-tree or the dap-ui panel opens. one entry
+        -- per filetype that can sit at the top of the left column.
         offsets = {
           {
             filetype = "NvimTree",
             text = "",
+            separator = true,
+          },
+          {
+            filetype = "dapui_scopes",
+            text = "DEBUG",
             separator = true,
           },
         },
