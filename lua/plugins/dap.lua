@@ -39,6 +39,19 @@ return {
     local dap = require("dap")
     local dapui = require("dapui")
 
+    -- one-line status in the message area. <leader>i -> build -> launch has a
+    -- noticeable pause; this keeps the user informed. `echo` (not notify) so a
+    -- later message just overwrites it and it clears itself.
+    local function status(msg)
+      vim.api.nvim_echo({ { "debug: " .. msg, "MoreMsg" } }, false, {})
+      vim.cmd("redraw")
+    end
+
+    -- set by start() when it auto-drops a breakpoint on main(); consumed by the
+    -- build step so the two bits of info share one status line instead of one
+    -- clobbering the other.
+    local auto_bp_note = nil
+
     ----------------------------------------------------------------------------
     -- build step (VSCode preLaunchTask equivalent)
     ----------------------------------------------------------------------------
@@ -59,6 +72,9 @@ return {
       local compiler = ft == "c" and "gcc" or "g++"
       local std = ft == "c" and "-std=c17" or "-std=c++23"
 
+      status("compiling" .. (auto_bp_note and ("  ·  " .. auto_bp_note) or "") .. "...")
+      auto_bp_note = nil
+
       local output = vim.fn.system({
         compiler,
         "-fdiagnostics-color=always",
@@ -70,10 +86,12 @@ return {
       })
 
       if vim.v.shell_error ~= 0 then
+        status("build failed")
         vim.notify(output, vim.log.levels.ERROR, { title = "C/C++ build failed" })
         error("dap: build failed")
       end
 
+      status("launching...")
       return out
     end
 
@@ -414,6 +432,7 @@ return {
       hide_tree()
       dapui.open()
       ctrl_render()
+      status("session started")
     end
     dap.listeners.before.event_terminated["dapui_config"] = teardown
     dap.listeners.before.event_exited["dapui_config"] = teardown
@@ -505,11 +524,13 @@ return {
             vim.api.nvim_win_set_cursor(win, { i, 0 })
             dap.toggle_breakpoint()
             vim.api.nvim_win_set_cursor(win, cursor)
-            vim.notify("debug: no breakpoints set - added one at main()", vim.log.levels.WARN)
+            -- picked up by build_current_file() and shown alongside "compiling"
+            auto_bp_note = "no breakpoints set, added one at main()"
             break
           end
         end
       end
+      status("starting...")
       dap.run(config)
     end
 
