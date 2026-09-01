@@ -16,7 +16,9 @@ map("n", "<leader>q", "<cmd>qa<cr>")
 map("n", "<leader>gd", "<C-]>")
 map("n", "<leader>gs", "<C-w>]")
 map("n", "<leader>gp", "<C-w>}")
--- <leader>d is the debug prefix (see lua/plugins/dap.lua); diagnostics float lives on <leader>c
+-- debug (see lua/plugins/dap.lua): <leader>i start/stop, <leader>b breakpoint,
+-- <leader>, continue, <leader>dr restart, <leader>dv/de/db/dt focus panels.
+-- diagnostics float on <leader>c
 map("n", "<leader>c", vim.diagnostic.open_float)
 map("n", "<leader>s", vim.lsp.buf.signature_help)
 map("n", "<leader>x", function()

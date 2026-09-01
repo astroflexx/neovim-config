@@ -19,9 +19,9 @@ return {
             separator = true,
           },
           {
-            filetype = "dapui_scopes",
+            filetype = "dapui_controls",
             text = "DEBUG",
-            separator = true,
+            separator = false,
           },
         },
       },

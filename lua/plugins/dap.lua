@@ -8,9 +8,8 @@
 --
 -- codelldb is the adapter used for C, C++ and Rust. it's the same LLDB-based
 -- backend the CodeLLDB VSCode extension uses. it ships STL pretty-printing out of
--- the box and supports stdio redirection, which is what makes it usable for
--- competitive programming (feed a file to stdin instead of typing the test case
--- by hand - see the "stdin from input.txt" launch configuration below).
+-- the box, and the integrated-terminal console lets you paste a test case
+-- straight into the program's stdin - enough for competitive programming.
 --
 -- the build step mirrors the old VSCode tasks.json exactly:
 --   g++ -fdiagnostics-color=always -g -std=c++23 <file> -o <fileDir>/<basename>
@@ -78,12 +77,6 @@ return {
       return out
     end
 
-    -- stdin file for the competitive-programming launch config: input.txt sitting
-    -- next to the source file.
-    local function stdin_file()
-      return vim.fn.expand("%:p:h") .. "/input.txt"
-    end
-
     ----------------------------------------------------------------------------
     -- launch configurations
     --
@@ -91,12 +84,12 @@ return {
     ----------------------------------------------------------------------------
 
     -- the default launch: build the current file and debug it. this is the only
-    -- entry in dap.configurations so <leader>dc never shows a picker.
+    -- entry in dap.configurations so <leader>i never shows a picker.
     --
     -- stopOnEntry stays false: codelldb's "entry" is the process entry point
     -- (_start in the dynamic linker), not main - stopping there dumps you in
-    -- disassembly. instead the <leader>dc / <leader>di helpers drop a breakpoint
-    -- on main() automatically when you haven't set any, so a session always stops
+    -- disassembly. instead the <leader>i helper drops a breakpoint on main()
+    -- automatically when you haven't set any, so a session always stops
     -- somewhere useful and the panel stays open.
     --
     -- console = "integratedTerminal" makes the bottom panel a real terminal: type
@@ -111,13 +104,6 @@ return {
       console = "integratedTerminal",
     }
 
-    -- competitive-programming variant: same, but stdin is redirected from
-    -- input.txt next to the source. run it directly via <leader>di.
-    local launch_current_stdin = vim.tbl_extend("force", launch_current, {
-      name = "C/C++: build & debug current file (stdin from input.txt)",
-      stdio = { stdin_file, nil, nil },
-    })
-
     dap.configurations.cpp = { launch_current }
     dap.configurations.c = { launch_current }
 
@@ -125,28 +111,194 @@ return {
     -- UI: nvim-dap-ui + virtual text
     ----------------------------------------------------------------------------
 
+    --------------------------------------------------------------------------
+    -- custom "controls" element
+    --
+    -- dap-ui's built-in controls can only live in a window's winbar: one line,
+    -- flush to the top edge, left-aligned. we want the play / step / stop
+    -- buttons centered with breathing room above and below, so we render our
+    -- own row into a dedicated element window at the top of the left panel.
+    -- mouse=a is on, so the icons stay clickable (handled below).
+    --------------------------------------------------------------------------
+
+    local ctrl = {
+      pad_above = 0, -- no blank padding - the row is the whole window
+      pad_below = 0,
+      width = 40, -- left panel width; used only for centering
+      sep = "   ",
+      buf = nil,
+      click = {}, -- byte column (1-based, on the icon row) -> action
+    }
+
+    -- button order. "play" doubles as pause while the program is running.
+    ctrl.buttons = {
+      {
+        key = "play",
+        hl = "DapUIPlayPause",
+        action = function()
+          local s = dap.session()
+          if not s or s.stopped_thread_id then
+            dap.continue()
+          else
+            dap.pause()
+          end
+        end,
+      },
+      { key = "step_over", hl = "DapUIStepOver", action = function() dap.step_over() end },
+      { key = "step_into", hl = "DapUIStepInto", action = function() dap.step_into() end },
+      { key = "step_out", hl = "DapUIStepOut", action = function() dap.step_out() end },
+      { key = "run_last", hl = "DapUIRestart", action = function() dap.run_last() end },
+      { key = "terminate", hl = "DapUIStop", action = function() dap.terminate() end },
+    }
+
+    local ctrl_ns = vim.api.nvim_create_namespace("dap_controls_bar")
+
+    -- create the buffer eagerly (plain sync context) so the element's
+    -- buffer() accessor - which dap-ui may call from an async context - only
+    -- ever has to hand back an existing handle.
+    local function ctrl_new_buffer()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].buftype = "nofile"
+      vim.bo[buf].bufhidden = "hide"
+      vim.bo[buf].swapfile = false
+      vim.bo[buf].modifiable = false
+      -- bufferline keys its left offset on this filetype (see bufferline.lua)
+      vim.bo[buf].filetype = "dapui_controls"
+      -- click dispatch: only the icon row, only within our buffer.
+      vim.keymap.set("n", "<LeftRelease>", function()
+        local pos = vim.fn.getmousepos()
+        if pos.winid == 0 or not vim.api.nvim_win_is_valid(pos.winid) then
+          return
+        end
+        if vim.api.nvim_win_get_buf(pos.winid) ~= ctrl.buf then
+          return
+        end
+        if pos.line ~= ctrl.pad_above + 1 then
+          return
+        end
+        local action = ctrl.click[pos.column]
+        if action then
+          action()
+        end
+      end, { buffer = buf, desc = "debug: click control button" })
+      return buf
+    end
+
+    ctrl.buf = ctrl_new_buffer()
+
+    local function ctrl_buffer()
+      if not (ctrl.buf and vim.api.nvim_buf_is_valid(ctrl.buf)) then
+        ctrl.buf = ctrl_new_buffer()
+      end
+      return ctrl.buf
+    end
+
+    local function ctrl_render()
+      vim.schedule(function()
+        local buf = ctrl_buffer()
+        local icons = require("dapui.config").controls.icons
+        local session = dap.session()
+        local running = session and not session.stopped_thread_id
+
+        local segs = {}
+        for _, b in ipairs(ctrl.buttons) do
+          if b.key == "play" then
+            segs[#segs + 1] = running and icons.pause or icons.play
+          else
+            segs[#segs + 1] = icons[b.key]
+          end
+        end
+
+        local body = table.concat(segs, ctrl.sep)
+        local pad = math.max(0, math.floor((ctrl.width - vim.fn.strdisplaywidth(body)) / 2))
+        local icon_row = string.rep(" ", pad) .. body
+
+        -- byte column -> action, plus highlight ranges, for each icon
+        ctrl.click = {}
+        local hls, col = {}, pad -- col: 0-based byte offset into icon_row
+        for i, icon in ipairs(segs) do
+          local nbytes = #icon
+          for c = col + 1, col + nbytes do
+            ctrl.click[c] = ctrl.buttons[i].action
+          end
+          hls[#hls + 1] = { ctrl.buttons[i].hl, col, col + nbytes }
+          col = col + nbytes + #ctrl.sep
+        end
+
+        local lines = {}
+        for _ = 1, ctrl.pad_above do
+          lines[#lines + 1] = ""
+        end
+        lines[#lines + 1] = icon_row
+        for _ = 1, ctrl.pad_below do
+          lines[#lines + 1] = ""
+        end
+
+        vim.bo[buf].modifiable = true
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+        vim.bo[buf].modifiable = false
+
+        vim.api.nvim_buf_clear_namespace(buf, ctrl_ns, 0, -1)
+        for _, h in ipairs(hls) do
+          pcall(vim.api.nvim_buf_set_extmark, buf, ctrl_ns, ctrl.pad_above, h[2], {
+            end_col = h[3],
+            hl_group = h[1],
+          })
+        end
+
+        -- dap-ui sizes elements as a fraction of the column; pin this one to
+        -- exactly the rows it needs so it doesn't hog space. also kill
+        -- cursorline (on globally) - otherwise it paints a grey bar across
+        -- the blank padding row the cursor sits on.
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+          if vim.api.nvim_win_get_buf(win) == buf then
+            pcall(vim.api.nvim_win_set_height, win, #lines)
+            vim.wo[win].cursorline = false
+            vim.wo[win].cursorcolumn = false
+            vim.wo[win].colorcolumn = ""
+          end
+        end
+      end)
+    end
+
+    -- keep the play/pause icon in sync with session state
+    for _, event in ipairs({
+      "event_initialized", "event_stopped", "event_continued",
+      "event_terminated", "event_exited",
+    }) do
+      dap.listeners.after[event]["dap_controls_bar"] = ctrl_render
+    end
+
     dapui.setup({
-      -- clickable play / pause / step / restart / stop toolbar. it renders in the
-      -- winbar of the element named here, so it sits at the very top of the left
-      -- panel (mouse=a is on, so the buttons are clickable). true VSCode-style
-      -- free-floating-over-the-editor controls aren't something dap-ui can do.
-      controls = { enabled = true, element = "scopes" },
+      -- our own centered button row replaces dap-ui's winbar controls.
+      controls = { enabled = false },
+      -- keep long C++ type strings (std::_Vector_base<...>) and multi-line
+      -- values from spilling out of the narrow left panel - truncate with an
+      -- ellipsis instead.
+      render = {
+        indent = 1,
+        max_type_length = 20,
+        max_value_lines = 3,
+      },
       layouts = {
         {
           -- left panel - replaces the file tree at the same width.
-          -- VARIABLES on top, WATCH below, BREAKPOINTS at the bottom. no call stack.
+          -- CONTROLS row on top, then VARIABLES / WATCH / BREAKPOINTS. no call stack.
           position = "left",
           size = 40,
           elements = {
-            { id = "scopes", size = 0.5 },
-            { id = "watches", size = 0.25 },
-            { id = "breakpoints", size = 0.25 },
+            -- controls is pinned to a fixed row count in ctrl_render; this
+            -- fraction is just its starting guess before the first render.
+            { id = "controls", size = 0.05 },
+            { id = "scopes", size = 0.46 },
+            { id = "watches", size = 0.28 },
+            { id = "breakpoints", size = 0.21 },
           },
         },
         {
           -- bottom panel - the program terminal: paste stdin, read stdout.
           position = "bottom",
-          size = 12,
+          size = 18,
           elements = {
             { id = "console", size = 1.0 },
           },
@@ -154,14 +306,40 @@ return {
       },
     })
 
+    dapui.register_element("controls", {
+      render = ctrl_render,
+      buffer = ctrl_buffer,
+      allow_without_session = true,
+    })
+
     require("nvim-dap-virtual-text").setup({
       commented = true, -- render the inline values as trailing comments
+      -- clamp the inline annotation so a big container value doesn't stretch
+      -- a code line off the right edge of the screen.
+      display_callback = function(variable, _buf, _stackframe, _node, options)
+        local value = variable.value:gsub("%s+", " ")
+        local max = 40
+        if #value > max then
+          value = value:sub(1, max - 1) .. "…"
+        end
+        if options.virt_text_pos == "inline" then
+          return " = " .. value
+        end
+        return variable.name .. " = " .. value
+      end,
     })
 
     -- open / close the UI automatically around a session, like VSCode.
     -- while a session is running, hide nvim-tree so the dap-ui left panel takes
     -- over the space, then bring the tree back afterwards.
+    --
+    -- on teardown the cursor must land back in the buffer the session was
+    -- started from - not in nvim-tree (which grabs focus when reopened) and not
+    -- in a leftover dap-ui window. we remember the origin buffer on init and
+    -- jump to a window showing it once the panels are gone.
     local tree_was_open = false
+    local origin_buf = nil
+
     local function hide_tree()
       local ok, view = pcall(require, "nvim-tree.view")
       tree_was_open = ok and view.is_visible()
@@ -169,25 +347,44 @@ return {
         require("nvim-tree.api").tree.close()
       end
     end
+
     local function restore_tree()
       if tree_was_open then
-        require("nvim-tree.api").tree.open()
+        pcall(function()
+          require("nvim-tree.api").tree.open()
+        end)
         tree_was_open = false
       end
     end
 
+    -- put the cursor back where debugging started from.
+    local function restore_focus()
+      if not (origin_buf and vim.api.nvim_buf_is_valid(origin_buf)) then
+        return
+      end
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_buf(win) == origin_buf then
+          pcall(vim.api.nvim_set_current_win, win)
+          return
+        end
+      end
+    end
+
+    local function teardown()
+      dapui.close()
+      restore_tree()
+      -- defer so nvim-tree's own focus-on-open has already run
+      vim.schedule(restore_focus)
+    end
+
     dap.listeners.after.event_initialized["dapui_config"] = function()
+      origin_buf = vim.api.nvim_get_current_buf()
       hide_tree()
       dapui.open()
+      ctrl_render()
     end
-    dap.listeners.before.event_terminated["dapui_config"] = function()
-      dapui.close()
-      restore_tree()
-    end
-    dap.listeners.before.event_exited["dapui_config"] = function()
-      dapui.close()
-      restore_tree()
-    end
+    dap.listeners.before.event_terminated["dapui_config"] = teardown
+    dap.listeners.before.event_exited["dapui_config"] = teardown
 
     ----------------------------------------------------------------------------
     -- gutter signs
@@ -200,12 +397,34 @@ return {
     vim.fn.sign_define("DapStopped", { text = "▶", texthl = "DiagnosticWarn", linehl = "Visual" })
 
     ----------------------------------------------------------------------------
-    -- keymaps - everything under <leader>d
+    -- keymaps
+    --
+    --   <leader>i   start / stop the session
+    --   <leader>,   continue (mid-session only)
+    --   <leader>b   toggle breakpoint
+    --   <leader>.   clear all breakpoints
+    --   <leader>dr  restart
+    --   <leader>dv/de/db/dt   focus the variables / expressions / breakpoints /
+    --                         terminal panel
+    --
+    -- stepping (over / into / out), pause etc. live on the clickable DEBUG
+    -- button bar at the top of the left panel.
     ----------------------------------------------------------------------------
 
     local map = vim.keymap.set
     local function d(desc)
       return { desc = "debug: " .. desc }
+    end
+
+    -- jump the cursor into a dap-ui panel by its buffer filetype
+    local function focus_panel(ft, label)
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == ft then
+          vim.api.nvim_set_current_win(win)
+          return
+        end
+      end
+      vim.notify("debug: " .. label .. " panel isn't open", vim.log.levels.WARN)
     end
 
     local function has_breakpoints()
@@ -241,55 +460,35 @@ return {
       dap.run(config)
     end
 
-    -- session control
-    map("n", "<leader>dc", function()
-      start(launch_current)
-    end, d("start / continue"))
-    map("n", "<leader>di", function()
-      start(launch_current_stdin)
-    end, d("start with stdin from input.txt"))
-    map("n", "<leader>dn", dap.step_over, d("step over (next)"))
-    map("n", "<leader>ds", dap.step_into, d("step into"))
-    map("n", "<leader>df", dap.step_out, d("step out (finish)"))
-    map("n", "<leader>dh", dap.run_to_cursor, d("run to cursor (here)"))
-    map("n", "<leader>dp", dap.pause, d("pause"))
-    map("n", "<leader>dx", dap.terminate, d("terminate"))
-    map("n", "<leader>dr", dap.restart, d("restart"))
-    map("n", "<leader>dl", dap.run_last, d("run last"))
+    -- <leader>i: no session -> start; running session -> terminate.
+    map("n", "<leader>i", function()
+      if dap.session() then
+        dap.terminate()
+      else
+        start(launch_current)
+      end
+    end, d("start / stop session"))
+
+    -- continue only makes sense mid-session; without this guard dap.continue()
+    -- would kick off a brand-new session (and its config picker).
+    map("n", "<leader>,", function()
+      if dap.session() then
+        dap.continue()
+      else
+        vim.notify("debug: no active session", vim.log.levels.WARN)
+      end
+    end, d("continue"))
 
     -- breakpoints
-    map("n", "<leader>db", dap.toggle_breakpoint, d("toggle breakpoint"))
-    map("n", "<leader>dB", function()
-      dap.set_breakpoint(vim.fn.input("breakpoint condition: "))
-    end, d("conditional breakpoint"))
-    map("n", "<leader>dL", function()
-      dap.set_breakpoint(nil, nil, vim.fn.input("log message: "))
-    end, d("logpoint"))
-    map("n", "<leader>dX", dap.clear_breakpoints, d("clear all breakpoints"))
-    map("n", "<leader>dq", function()
-      dap.list_breakpoints()
-      vim.cmd("copen")
-    end, d("list breakpoints (quickfix)"))
+    map("n", "<leader>b", dap.toggle_breakpoint, d("toggle breakpoint"))
+    map("n", "<leader>.", dap.clear_breakpoints, d("clear all breakpoints"))
 
-    -- inspect / panels
-    map({ "n", "v" }, "<leader>de", function()
-      dapui.eval(nil, { enter = true })
-    end, d("eval expression popup"))
-    map({ "n", "v" }, "<leader>dw", function()
-      local mode = vim.fn.mode()
-      local expr
-      if mode == "v" or mode == "V" then
-        expr = table.concat(
-          vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = mode }),
-          " "
-        )
-        vim.api.nvim_input("<Esc>")
-      else
-        expr = vim.fn.expand("<cexpr>")
-      end
-      dapui.elements.watches.add(expr)
-    end, d("add to watches"))
-    map("n", "<leader>du", dapui.toggle, d("toggle dap-ui"))
-    map("n", "<leader>dR", dap.repl.toggle, d("toggle REPL"))
+    map("n", "<leader>dr", dap.restart, d("restart"))
+
+    -- focus a dap-ui panel
+    map("n", "<leader>dv", function() focus_panel("dapui_scopes", "variables") end, d("focus variables panel"))
+    map("n", "<leader>de", function() focus_panel("dapui_watches", "expressions") end, d("focus expressions panel"))
+    map("n", "<leader>db", function() focus_panel("dapui_breakpoints", "breakpoints") end, d("focus breakpoints panel"))
+    map("n", "<leader>dt", function() focus_panel("dapui_console", "terminal") end, d("focus debug terminal panel"))
   end,
 }
