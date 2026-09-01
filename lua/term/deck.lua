@@ -3,7 +3,7 @@
 --
 --   <leader>p        show / hide the deck (shells keep running while hidden)
 --   <leader>n        new tab
---   <leader>h / l    previous / next tab      (also gt / gT; {count}gt jumps)
+--   <leader>h / l    previous / next tab
 --   <leader>1..9     jump to tab N
 --   <leader>x        close + kill the current tab (guarded if it is busy)
 --
@@ -65,8 +65,6 @@ local function set_keymaps(bufnr)
   vim.keymap.set("n", "<leader>n", function() M.new_tab() end, opts)
   vim.keymap.set("n", "<leader>l", function() M.next() end, opts)
   vim.keymap.set("n", "<leader>h", function() M.prev() end, opts)
-  vim.keymap.set("n", "gt", function() M.next(vim.v.count) end, opts)
-  vim.keymap.set("n", "gT", function() M.prev() end, opts)
   for i = 1, 9 do
     vim.keymap.set("n", "<leader>" .. i, function() M.go(i) end, opts)
   end
@@ -163,10 +161,8 @@ function M.go(idx)
   if tabs[idx] then show(idx) end
 end
 
---- Next tab, stopping at the last, or jump to tab `count` when given (so
---- `{count}gt` works). Non-wrapping, like the bufferline h/l keys.
-function M.next(count)
-  if count and count > 0 then return M.go(count) end
+--- Next tab, stopping at the last. Non-wrapping, like the bufferline h/l keys.
+function M.next()
   if current < #tabs then show(current + 1) end
 end
 
