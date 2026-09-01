@@ -272,6 +272,16 @@ return {
     dapui.setup({
       -- our own centered button row replaces dap-ui's winbar controls.
       controls = { enabled = false },
+      -- in the variables panel, "o" expands / collapses a node like <CR>.
+      -- scoped to that element, and we drop "o" from the "open" action there
+      -- (globally "o" = open) so it doesn't double-bind / flash "No open
+      -- action for current line".
+      element_mappings = {
+        scopes = {
+          expand = { "<CR>", "o", "<2-LeftMouse>" },
+          open = {},
+        },
+      },
       -- keep long C++ type strings (std::_Vector_base<...>) and multi-line
       -- values from spilling out of the narrow left panel - truncate with an
       -- ellipsis instead.
@@ -370,9 +380,71 @@ return {
       end
     end
 
+    -- collapse the Static / Global / Registers scopes on the first stop of a
+    -- session - they're noise for competitive programming, only Local matters.
+    -- done once per session by feeding the dap-ui expand mapping (<CR>) on each
+    -- header that is CURRENTLY expanded (dap-ui keeps its collapse state for the
+    -- whole nvim session, so on a 2nd session they may already be folded -
+    -- toggling blindly would re-open them). bottom-up so collapsing one doesn't
+    -- shift the headers still to process.
+    local noisy_scopes = { Static = true, Global = true, Registers = true }
+    local scopes_collapsed = false
+    local function collapse_noisy_scopes(attempt)
+      if scopes_collapsed then
+        return
+      end
+      attempt = attempt or 1
+      local win
+      for _, w in ipairs(vim.api.nvim_list_wins()) do
+        if vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "dapui_scopes" then
+          win = w
+          break
+        end
+      end
+
+      local expanded_icon = require("dapui.config").icons.expanded
+      local targets, saw_header = {}, false
+      if win then
+        local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), 0, -1, false)
+        for lnum, line in ipairs(lines) do
+          local name = line:match("^%s?%S*%s*(%a+):%s*$")
+          if name then
+            saw_header = true
+            if noisy_scopes[name] and vim.startswith(vim.trim(line), expanded_icon) then
+              targets[#targets + 1] = lnum
+            end
+          end
+        end
+      end
+
+      -- retry only while the panel hasn't rendered its scope headers yet
+      if not saw_header then
+        if attempt < 10 then
+          vim.defer_fn(function() collapse_noisy_scopes(attempt + 1) end, 150)
+        end
+        return
+      end
+      scopes_collapsed = true
+      if #targets == 0 then
+        return
+      end
+      table.sort(targets, function(a, b) return a > b end)
+      local cur = vim.api.nvim_get_current_win()
+      vim.api.nvim_set_current_win(win)
+      local cr = vim.api.nvim_replace_termcodes("<CR>", true, false, true)
+      for _, lnum in ipairs(targets) do
+        vim.api.nvim_win_set_cursor(win, { lnum, 0 })
+        vim.api.nvim_feedkeys(cr, "x", false)
+      end
+      if vim.api.nvim_win_is_valid(cur) then
+        vim.api.nvim_set_current_win(cur)
+      end
+    end
+
     local function teardown()
       dapui.close()
       restore_tree()
+      scopes_collapsed = false
       -- defer so nvim-tree's own focus-on-open has already run
       vim.schedule(restore_focus)
     end
@@ -382,6 +454,9 @@ return {
       hide_tree()
       dapui.open()
       ctrl_render()
+    end
+    dap.listeners.after.event_stopped["dapui_collapse_scopes"] = function()
+      vim.defer_fn(collapse_noisy_scopes, 150)
     end
     dap.listeners.before.event_terminated["dapui_config"] = teardown
     dap.listeners.before.event_exited["dapui_config"] = teardown
@@ -404,7 +479,8 @@ return {
     --   <leader>b   toggle breakpoint
     --   <leader>.   clear all breakpoints
     --   <leader>dr  restart
-    --   <leader>dv/de/db/dt   focus the variables / expressions / breakpoints /
+    --   <leader>de  jump focus back to the editor
+    --   <leader>dv/dw/db/dt   focus the variables / expressions / breakpoints /
     --                         terminal panel
     --
     -- stepping (over / into / out), pause etc. live on the clickable DEBUG
@@ -425,6 +501,26 @@ return {
         end
       end
       vim.notify("debug: " .. label .. " panel isn't open", vim.log.levels.WARN)
+    end
+
+    -- jump back to the editor from any panel: prefer the buffer the session
+    -- was started from, else the first normal file window.
+    local function focus_editor()
+      if origin_buf and vim.api.nvim_buf_is_valid(origin_buf) then
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+          if vim.api.nvim_win_get_buf(win) == origin_buf then
+            vim.api.nvim_set_current_win(win)
+            return
+          end
+        end
+      end
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        local b = vim.api.nvim_win_get_buf(win)
+        if vim.bo[b].buftype == "" and vim.bo[b].filetype ~= "NvimTree" then
+          vim.api.nvim_set_current_win(win)
+          return
+        end
+      end
     end
 
     local function has_breakpoints()
@@ -485,9 +581,10 @@ return {
 
     map("n", "<leader>dr", dap.restart, d("restart"))
 
-    -- focus a dap-ui panel
+    -- focus panels / jump back to the editor
+    map("n", "<leader>de", focus_editor, d("focus editor"))
     map("n", "<leader>dv", function() focus_panel("dapui_scopes", "variables") end, d("focus variables panel"))
-    map("n", "<leader>de", function() focus_panel("dapui_watches", "expressions") end, d("focus expressions panel"))
+    map("n", "<leader>dw", function() focus_panel("dapui_watches", "expressions") end, d("focus expressions panel"))
     map("n", "<leader>db", function() focus_panel("dapui_breakpoints", "breakpoints") end, d("focus breakpoints panel"))
     map("n", "<leader>dt", function() focus_panel("dapui_console", "terminal") end, d("focus debug terminal panel"))
   end,
