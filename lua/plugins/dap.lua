@@ -290,12 +290,16 @@ return {
     dapui.setup({
       -- our own centered button row replaces dap-ui's winbar controls.
       controls = { enabled = false },
-      -- in the variables panel, "o" expands / collapses a node like <CR>.
-      -- scoped to that element, and we drop "o" from the "open" action there
-      -- (globally "o" = open) so it doesn't double-bind / flash "No open
+      -- in the variables + watch panels, "o" expands / collapses a node like
+      -- <CR>. scoped to those elements, and we drop "o" from the "open" action
+      -- there (globally "o" = open) so it doesn't double-bind / flash "No open
       -- action for current line".
       element_mappings = {
         scopes = {
+          expand = { "<CR>", "o", "<2-LeftMouse>" },
+          open = {},
+        },
+        watches = {
           expand = { "<CR>", "o", "<2-LeftMouse>" },
           open = {},
         },
@@ -354,6 +358,38 @@ return {
           return " = " .. value
         end
         return variable.name .. " = " .. value
+      end,
+    })
+
+    --------------------------------------------------------------------------
+    -- hide the block cursor in the variables + breakpoints panels - the
+    -- cursorline (white bar) already shows the position there. the TUI paints
+    -- the block using its highlight group's colours, so we point 'guicursor'
+    -- at a group whose fg/bg both match the CursorLine background: the block
+    -- melts into the bar. restored on leaving the panel.
+    --------------------------------------------------------------------------
+    local function refresh_hidden_cursor()
+      local cl = vim.api.nvim_get_hl(0, { name = "CursorLine", link = false })
+      local bg = cl.bg or vim.api.nvim_get_hl(0, { name = "Normal", link = false }).bg
+      if bg then
+        vim.api.nvim_set_hl(0, "DapHiddenCursor", { fg = bg, bg = bg })
+      end
+    end
+    vim.api.nvim_create_autocmd("ColorScheme", { callback = refresh_hidden_cursor })
+
+    local cursorless_ft = { dapui_scopes = true, dapui_breakpoints = true }
+    local guicursor_saved
+    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
+      callback = function()
+        if cursorless_ft[vim.bo.filetype] then
+          refresh_hidden_cursor() -- recompute in case the colour wasn't ready earlier
+          guicursor_saved = guicursor_saved or vim.o.guicursor
+          vim.o.guicursor = "a:DapHiddenCursor"
+          vim.wo.cursorline = true
+        elseif guicursor_saved then
+          vim.o.guicursor = guicursor_saved
+          guicursor_saved = nil
+        end
       end,
     })
 
@@ -452,6 +488,7 @@ return {
     --
     --   <leader>i   start / stop the session
     --   <leader>,   continue (mid-session only)
+    --   <leader>o   step over
     --   <leader>b   toggle breakpoint
     --   <leader>.   clear all breakpoints
     --   <leader>dr  restart
@@ -459,8 +496,8 @@ return {
     --   <leader>dv/dw/db/dt   focus the variables / expressions / breakpoints /
     --                         terminal panel
     --
-    -- stepping (over / into / out), pause etc. live on the clickable DEBUG
-    -- button bar at the top of the left panel.
+    -- step into / out, pause, restart also live on the clickable DEBUG button
+    -- bar at the top of the left panel.
     ----------------------------------------------------------------------------
 
     local map = vim.keymap.set
@@ -552,6 +589,7 @@ return {
         vim.notify("debug: no active session", vim.log.levels.WARN)
       end
     end, d("continue"))
+    map("n", "<leader>o", dap.step_over, d("step over"))
 
     -- breakpoints
     map("n", "<leader>b", dap.toggle_breakpoint, d("toggle breakpoint"))
