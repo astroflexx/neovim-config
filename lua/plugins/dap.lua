@@ -380,71 +380,31 @@ return {
       end
     end
 
-    -- collapse the Static / Global / Registers scopes on the first stop of a
-    -- session - they're noise for competitive programming, only Local matters.
-    -- done once per session by feeding the dap-ui expand mapping (<CR>) on each
-    -- header that is CURRENTLY expanded (dap-ui keeps its collapse state for the
-    -- whole nvim session, so on a 2nd session they may already be folded -
-    -- toggling blindly would re-open them). bottom-up so collapsing one doesn't
-    -- shift the headers still to process.
+    -- Static / Global / Registers scopes are noise for competitive programming
+    -- (only Local matters), so start them collapsed - with no flash of them
+    -- open first. dap-ui's scopes component auto-folds any scope the adapter
+    -- marks `expensive`, so we tag those three `expensive` on the FIRST scopes
+    -- response of each session, before dap-ui's `after` listener sees it. only
+    -- the first response: after that the user's manual expand/collapse sticks
+    -- (the component only ever force-folds, never force-opens).
     local noisy_scopes = { Static = true, Global = true, Registers = true }
-    local scopes_collapsed = false
-    local function collapse_noisy_scopes(attempt)
-      if scopes_collapsed then
+    local folded_this_session = false
+    dap.listeners.before["scopes"]["dap_fold_noisy_scopes"] = function(_, err, response)
+      if folded_this_session or err or not (response and response.scopes) then
         return
       end
-      attempt = attempt or 1
-      local win
-      for _, w in ipairs(vim.api.nvim_list_wins()) do
-        if vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "dapui_scopes" then
-          win = w
-          break
+      folded_this_session = true
+      for _, scope in ipairs(response.scopes) do
+        if noisy_scopes[scope.name] then
+          scope.expensive = true
         end
-      end
-
-      local expanded_icon = require("dapui.config").icons.expanded
-      local targets, saw_header = {}, false
-      if win then
-        local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), 0, -1, false)
-        for lnum, line in ipairs(lines) do
-          local name = line:match("^%s?%S*%s*(%a+):%s*$")
-          if name then
-            saw_header = true
-            if noisy_scopes[name] and vim.startswith(vim.trim(line), expanded_icon) then
-              targets[#targets + 1] = lnum
-            end
-          end
-        end
-      end
-
-      -- retry only while the panel hasn't rendered its scope headers yet
-      if not saw_header then
-        if attempt < 10 then
-          vim.defer_fn(function() collapse_noisy_scopes(attempt + 1) end, 150)
-        end
-        return
-      end
-      scopes_collapsed = true
-      if #targets == 0 then
-        return
-      end
-      table.sort(targets, function(a, b) return a > b end)
-      local cur = vim.api.nvim_get_current_win()
-      vim.api.nvim_set_current_win(win)
-      local cr = vim.api.nvim_replace_termcodes("<CR>", true, false, true)
-      for _, lnum in ipairs(targets) do
-        vim.api.nvim_win_set_cursor(win, { lnum, 0 })
-        vim.api.nvim_feedkeys(cr, "x", false)
-      end
-      if vim.api.nvim_win_is_valid(cur) then
-        vim.api.nvim_set_current_win(cur)
       end
     end
 
     local function teardown()
       dapui.close()
       restore_tree()
-      scopes_collapsed = false
+      folded_this_session = false
       -- defer so nvim-tree's own focus-on-open has already run
       vim.schedule(restore_focus)
     end
@@ -454,9 +414,6 @@ return {
       hide_tree()
       dapui.open()
       ctrl_render()
-    end
-    dap.listeners.after.event_stopped["dapui_collapse_scopes"] = function()
-      vim.defer_fn(collapse_noisy_scopes, 150)
     end
     dap.listeners.before.event_terminated["dapui_config"] = teardown
     dap.listeners.before.event_exited["dapui_config"] = teardown
