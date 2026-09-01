@@ -52,23 +52,33 @@ return {
     -- clobbering the other.
     local auto_bp_note = nil
 
+    -- the buffer being debugged, pinned by start(). the build step must NOT read
+    -- the "current" buffer: on restart, nvim-dap resolves program() while focus
+    -- may be in a dap-ui panel or the tree.
+    local target_buf = nil
+
     ----------------------------------------------------------------------------
     -- build step (VSCode preLaunchTask equivalent)
     ----------------------------------------------------------------------------
 
-    -- compile the current C/C++ buffer and return the path to the executable.
+    -- compile the debugged C/C++ buffer and return the path to the executable.
     -- raises on failure so nvim-dap aborts the launch; the compiler output is
     -- surfaced via vim.notify.
     local function build_current_file()
-      local ft = vim.bo.filetype
+      local buf = (target_buf and vim.api.nvim_buf_is_valid(target_buf)) and target_buf
+        or vim.api.nvim_get_current_buf()
+      local ft = vim.bo[buf].filetype
       if ft ~= "cpp" and ft ~= "c" then
         error("dap: current buffer is not a C/C++ file")
       end
 
-      vim.cmd("silent! write")
+      vim.api.nvim_buf_call(buf, function()
+        vim.cmd("silent! write")
+      end)
 
-      local file = vim.fn.expand("%:p")
-      local out = vim.fn.expand("%:p:h") .. "/" .. vim.fn.expand("%:t:r")
+      local path = vim.api.nvim_buf_get_name(buf)
+      local file = vim.fn.fnamemodify(path, ":p")
+      local out = vim.fn.fnamemodify(path, ":p:h") .. "/" .. vim.fn.fnamemodify(path, ":t:r")
       local compiler = ft == "c" and "gcc" or "g++"
       local std = ft == "c" and "-std=c17" or "-std=c++23"
 
@@ -464,7 +474,8 @@ return {
     end
 
     dap.listeners.after.event_initialized["dapui_config"] = function()
-      origin_buf = vim.api.nvim_get_current_buf()
+      origin_buf = (target_buf and vim.api.nvim_buf_is_valid(target_buf))
+        and target_buf or vim.api.nvim_get_current_buf()
       hide_tree()
       dapui.open()
       ctrl_render()
@@ -491,7 +502,7 @@ return {
     --   <leader>o   step over
     --   <leader>b   toggle breakpoint
     --   <leader>.   clear all breakpoints
-    --   <leader>dr  restart
+    --   <leader>dr  restart (full: terminate -> rebuild -> fresh panels)
     --   <leader>de  jump focus back to the editor
     --   <leader>dv/dw/db/dt   focus the variables / expressions / breakpoints /
     --                         terminal panel
@@ -547,23 +558,29 @@ return {
 
     -- start a session; if it's already running just continue. when no breakpoints
     -- are set, drop one on main() first so the run always stops instead of
-    -- flashing past.
-    local function start(config)
+    -- flashing past. `keep_target` reuses the previously-debugged buffer (used by
+    -- restart, where focus may no longer be on the code).
+    local function start(config, keep_target)
       if dap.session() then
         dap.continue()
         return
       end
+      if not (keep_target and target_buf and vim.api.nvim_buf_is_valid(target_buf)) then
+        target_buf = vim.api.nvim_get_current_buf()
+      end
       if not has_breakpoints() then
-        local win = vim.api.nvim_get_current_win()
-        local cursor = vim.api.nvim_win_get_cursor(win)
-        for i, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
-          if line:match("%f[%a]main%s*%(") then
-            vim.api.nvim_win_set_cursor(win, { i, 0 })
-            dap.toggle_breakpoint()
-            vim.api.nvim_win_set_cursor(win, cursor)
-            -- picked up by build_current_file() and shown alongside "compiling"
-            auto_bp_note = "no breakpoints set, added one at main()"
-            break
+        local win = vim.fn.bufwinid(target_buf)
+        if win ~= -1 then
+          local cursor = vim.api.nvim_win_get_cursor(win)
+          for i, line in ipairs(vim.api.nvim_buf_get_lines(target_buf, 0, -1, false)) do
+            if line:match("%f[%a]main%s*%(") then
+              vim.api.nvim_win_set_cursor(win, { i, 0 })
+              dap.toggle_breakpoint()
+              vim.api.nvim_win_set_cursor(win, cursor)
+              -- picked up by build_current_file() and shown alongside "compiling"
+              auto_bp_note = "no breakpoints set, added one at main()"
+              break
+            end
           end
         end
       end
@@ -595,7 +612,23 @@ return {
     map("n", "<leader>b", dap.toggle_breakpoint, d("toggle breakpoint"))
     map("n", "<leader>.", dap.clear_breakpoints, d("clear all breakpoints"))
 
-    map("n", "<leader>dr", dap.restart, d("restart"))
+    -- dap.restart() with codelldb sends a bare `restart` request: it reruns the
+    -- STALE binary (our build step never re-fires) and leaves the panels /
+    -- terminal from the old run on screen. do a real restart instead - fully
+    -- terminate, let teardown close everything, then start() again (which
+    -- rebuilds, reopens fresh panels and a fresh terminal).
+    map("n", "<leader>dr", function()
+      if not dap.session() then
+        status("no session to restart")
+        return
+      end
+      status("restarting...")
+      dap.terminate(nil, nil, function()
+        vim.schedule(function()
+          start(launch_current, true) -- keep debugging the same buffer
+        end)
+      end)
+    end, d("restart (rebuild + fresh panels)"))
 
     -- focus panels / jump back to the editor
     map("n", "<leader>de", focus_editor, d("focus editor"))
