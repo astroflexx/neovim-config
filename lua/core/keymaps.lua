@@ -21,6 +21,18 @@ map("n", "<leader>gp", "<C-w>}")
 -- diagnostics float on <leader>c
 map("n", "<leader>c", vim.diagnostic.open_float)
 map("n", "<leader>s", vim.lsp.buf.signature_help)
+
+-- <leader>y: yank the whole buffer to the system clipboard (like :%y+)
+map("n", "<leader>y", function()
+  if vim.bo.buftype ~= "" or vim.api.nvim_buf_get_name(0) == "" then
+    vim.notify("not a file buffer, can't yank", vim.log.levels.ERROR)
+    return
+  end
+  vim.cmd('%yank +')
+  local lines = vim.api.nvim_buf_line_count(0)
+  local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":t")
+  vim.notify(string.format("yanked %d line%s from %s", lines, lines == 1 and "" or "s", name))
+end)
 map("n", "<leader>x", function()
   local bt = vim.bo.buftype
   local ft = vim.bo.filetype
