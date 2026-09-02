@@ -27,6 +27,13 @@ local M = {}
 
 local json_path = vim.fn.stdpath("config") .. "/snippets/cpp.json"
 
+-- The group the float's border actually resolves to (see the `winhighlight`
+-- below). Named once because the title padding has to match it exactly.
+local BORDER_HL = "WinSeparator"
+
+-- How many columns left of dead centre the title word sits.
+local TITLE_SHIFT = 2
+
 -- Re-applied on ColorScheme: loading a theme runs `hi clear`.
 local function set_hls()
   vim.api.nvim_set_hl(0, "AlgoSnippetSel", { link = "PmenuSel", default = true })
@@ -95,11 +102,11 @@ function M.open()
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
-  -- keep cmp off this buffer: it activates on InsertEnter and would otherwise
-  -- pop a `buffer`-source menu over the modal as you type the query.
-  pcall(function()
-    require("cmp").setup.buffer({ enabled = false })
-  end)
+  -- keep cmp entirely off this buffer -- both its auto menu and the manual
+  -- `cmp.complete()` its refresh-on-delete autocmd fires. cmp.lua's `enabled`
+  -- and that autocmd both bail when this var is set (buffer-level
+  -- `enabled = false` does not stop a Manual `cmp.complete()`).
+  vim.b[buf].algo_snippet_modal = true
 
   local win = vim.api.nvim_open_win(buf, true, {
     relative = "editor",
@@ -109,14 +116,20 @@ function M.open()
     col = math.floor((vim.o.columns - width) / 2),
     style = "minimal",
     border = "rounded",
-    -- No padding around the word beyond the single spaces: the title replaces
-    -- that slice of the top border, so trailing blanks punch a visible hole in
-    -- the rule rather than shifting the word.
-    title = " snippets ",
+    -- The title is painted INTO the top border, replacing that slice of the
+    -- rule -- so padding it with spaces to nudge the word off dead centre (a
+    -- cursor sits there; the word reads better just left of it) leaves a hole
+    -- in the border. `title` takes [text, highlight] chunks, so the padding is
+    -- the border glyph itself wearing the border's highlight: the rule stays
+    -- unbroken, and centring title+pad puts the word TITLE_SHIFT columns left.
+    title = {
+      { " snippets ", "FloatTitle" },
+      { string.rep("─", TITLE_SHIFT * 2), BORDER_HL },
+    },
     title_pos = "center",
     zindex = 100,
   })
-  vim.wo[win].winhighlight = "NormalFloat:Normal,FloatBorder:WinSeparator"
+  vim.wo[win].winhighlight = "NormalFloat:Normal,FloatBorder:" .. BORDER_HL
   vim.wo[win].wrap = false
   vim.wo[win].scrolloff = 0
   vim.wo[win].sidescrolloff = 0
@@ -228,6 +241,25 @@ function M.open()
   local kopts = { buffer = buf, nowait = true, silent = true }
   vim.keymap.set({ "i", "n" }, "<CR>", accept, kopts)
   vim.keymap.set("n", "<leader>x", dismiss, kopts)
+
+  -- The query lives on real buffer line 1, with the divider rule on line 2. The
+  -- line-kill operators would delete line 1 outright, pulling the rule up so it
+  -- reads as the query ("(no match)"). Rebind them to just blank the query.
+  local function clear_query(insert)
+    vim.api.nvim_buf_set_lines(buf, 0, 1, false, { "" })
+    vim.api.nvim_win_set_cursor(win, { 1, 0 })
+    last_query = nil
+    render()
+    if insert then
+      vim.cmd.startinsert()
+    end
+  end
+  for _, lhs in ipairs({ "dd", "D" }) do
+    vim.keymap.set("n", lhs, function() clear_query(false) end, kopts)
+  end
+  for _, lhs in ipairs({ "cc", "C", "S" }) do
+    vim.keymap.set("n", lhs, function() clear_query(true) end, kopts)
+  end
 
   local grp = vim.api.nvim_create_augroup("algo_snippets_" .. buf, { clear = true })
   vim.api.nvim_create_autocmd({ "TextChangedI", "TextChanged" }, {

@@ -42,6 +42,23 @@ return {
     end
 
     cmp.setup({
+      -- The <leader>a snippet picker (lua/core/snippets.lua) is a plain insert-
+      -- mode buffer; cmp must stay completely off it -- both the automatic menu
+      -- and the manual `cmp.complete()` fired by the refresh-on-delete autocmd
+      -- below, which ignores buffer-level `enabled = false`. Gate on the marker
+      -- var the picker sets. Everything after the first line mirrors nvim-cmp's
+      -- default `enabled`.
+      enabled = function()
+        if vim.b.algo_snippet_modal then
+          return false
+        end
+        if vim.api.nvim_get_option_value("buftype", { buf = 0 }) == "prompt" then
+          return false
+        end
+        return vim.fn.reg_recording() == ""
+          and vim.fn.reg_executing() == ""
+          and not require("cmp.config.context").in_treesitter_capture("comment")
+      end,
       performance = {
         max_view_entries = 10,
       },
@@ -193,6 +210,9 @@ return {
     vim.api.nvim_create_autocmd({ "InsertEnter", "TextChangedI", "InsertLeave" }, {
       group = vim.api.nvim_create_augroup("cmp_refresh_on_delete", { clear = true }),
       callback = function(args)
+        if vim.b[args.buf].algo_snippet_modal then
+          return -- the snippet picker buffer: never drive cmp here
+        end
         if args.event == "InsertLeave" then
           last_line[args.buf] = nil
           return
