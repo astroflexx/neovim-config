@@ -63,6 +63,7 @@ return {
     { [[<C-\>]], [[<cmd>1ToggleTerm<cr>]], mode = { "n", "t" }, desc = "Toggle terminal panel" },
     { "<leader>t", [[<cmd>1ToggleTerm<cr>]], desc = "Toggle terminal panel (kill when focused)" },
     { "<leader>p", function() require("term.deck").toggle() end, desc = "Toggle terminal deck" },
+    { "<leader>u", function() require("term.run").compile_and_run() end, desc = "Compile & run current C/C++ file" },
   },
   cmd = { "ToggleTerm", "TermExec" },
   config = function()

@@ -22,6 +22,12 @@ map("n", "<leader>gp", "<C-w>}")
 map("n", "<leader>c", vim.diagnostic.open_float)
 map("n", "<leader>s", vim.lsp.buf.signature_help)
 
+-- <leader>m: drop search highlight and wipe the command line
+map("n", "<leader>m", function()
+  vim.cmd("nohlsearch")
+  vim.cmd("echo ''")
+end)
+
 -- <leader>y: yank the whole buffer to the system clipboard (like :%y+)
 map("n", "<leader>y", function()
   if vim.bo.buftype ~= "" or vim.api.nvim_buf_get_name(0) == "" then
