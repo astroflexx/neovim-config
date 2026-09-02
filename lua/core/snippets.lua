@@ -27,7 +27,15 @@ local M = {}
 
 local json_path = vim.fn.stdpath("config") .. "/snippets/cpp.json"
 
-vim.api.nvim_set_hl(0, "AlgoSnippetSel", { link = "PmenuSel", default = true })
+-- Re-applied on ColorScheme: loading a theme runs `hi clear`.
+local function set_hls()
+  vim.api.nvim_set_hl(0, "AlgoSnippetSel", { link = "PmenuSel", default = true })
+  -- the hint text and the divider rule: plain white, not the theme's green
+  -- Comment / near-invisible WinSeparator.
+  vim.api.nvim_set_hl(0, "AlgoSnippetDim", { fg = "#d4d4d4" })
+end
+set_hls()
+vim.api.nvim_create_autocmd("ColorScheme", { callback = vim.schedule_wrap(set_hls) })
 
 -- Load + normalise the generated JSON on every open: the file is tiny, and
 -- re-reading it means the list is fresh the moment you re-run the build script
@@ -82,7 +90,8 @@ function M.open()
   end
 
   local width = math.min(72, math.max(40, math.floor(vim.o.columns * 0.6)))
-  local height = math.min(#items + 1, math.max(8, math.floor(vim.o.lines * 0.6)))
+  local rule = string.rep("─", width)
+  local height = math.min(#items + 2, math.max(8, math.floor(vim.o.lines * 0.6)))
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
@@ -100,28 +109,37 @@ function M.open()
     col = math.floor((vim.o.columns - width) / 2),
     style = "minimal",
     border = "rounded",
+    -- No padding around the word beyond the single spaces: the title replaces
+    -- that slice of the top border, so trailing blanks punch a visible hole in
+    -- the rule rather than shifting the word.
     title = " snippets ",
     title_pos = "center",
     zindex = 100,
   })
   vim.wo[win].winhighlight = "NormalFloat:Normal,FloatBorder:WinSeparator"
   vim.wo[win].wrap = false
+  vim.wo[win].scrolloff = 0
+  vim.wo[win].sidescrolloff = 0
 
   local sel_ns = vim.api.nvim_create_namespace("algo_snippets_sel")
   local hint_ns = vim.api.nvim_create_namespace("algo_snippets_hint")
+  local sep_ns = vim.api.nvim_create_namespace("algo_snippets_sep")
 
   local filtered = items -- the items currently listed on lines 2..
   local last_query = nil
   local closing = false
 
+  -- Buffer layout: line 1 = query, line 2 = blank spacer, lines 3.. = the list.
+  local LIST_TOP = 3
+
   -- The effective selection: the row the cursor is on, or the first row while
-  -- the cursor is still up in the query line. 1-based index into `filtered`.
+  -- the cursor is still up in the query / spacer rows. 1-based into `filtered`.
   local function sel_index()
     if #filtered == 0 then
       return nil
     end
     local row = vim.api.nvim_win_get_cursor(win)[1]
-    local idx = row >= 2 and (row - 1) or 1
+    local idx = row >= LIST_TOP and (row - LIST_TOP + 1) or 1
     return math.min(idx, #filtered)
   end
 
@@ -129,7 +147,7 @@ function M.open()
     vim.api.nvim_buf_clear_namespace(buf, sel_ns, 0, -1)
     local idx = sel_index()
     if idx then
-      vim.api.nvim_buf_set_extmark(buf, sel_ns, idx, 0, { line_hl_group = "AlgoSnippetSel" })
+      vim.api.nvim_buf_set_extmark(buf, sel_ns, idx + LIST_TOP - 2, 0, { line_hl_group = "AlgoSnippetSel" })
     end
   end
 
@@ -157,13 +175,21 @@ function M.open()
     if #lines == 0 then
       lines = { "  (no match)" }
     end
+    table.insert(lines, 1, rule) -- divider row between the query line and list
     vim.api.nvim_buf_set_lines(buf, 1, -1, false, lines)
+    vim.api.nvim_buf_clear_namespace(buf, sep_ns, 0, -1)
+    vim.api.nvim_buf_set_extmark(buf, sep_ns, 1, 0, {
+      end_col = #rule,
+      hl_group = "AlgoSnippetDim",
+    })
 
     vim.api.nvim_buf_clear_namespace(buf, hint_ns, 0, -1)
     if q == "" then
+      -- "overlay" at column 0 puts the hint exactly where a list row's text
+      -- sits -- flush under the border, no stray leading gap that "eol" adds.
       vim.api.nvim_buf_set_extmark(buf, hint_ns, 0, 0, {
-        virt_text = { { "  type to filter", "Comment" } },
-        virt_text_pos = "eol",
+        virt_text = { { "type to filter", "AlgoSnippetDim" } },
+        virt_text_pos = "overlay",
       })
     end
 
