@@ -27,6 +27,20 @@ local M = {}
 
 local json_path = vim.fn.stdpath("config") .. "/snippets/cpp.json"
 
+-- vim.snippet.expand() parses the body as an LSP snippet, so a literal `$` in
+-- the C++ (e.g. manacher's sentinel `t = "$" + t + "^"`) is read as a malformed
+-- tabstop and the whole parse fails. The snippet files only ever use `$1`..`$9`,
+-- `$0` and `${1:...}` as genuine tabstops -- backslash-escape every other `$`.
+local function escape_stray_dollars(body)
+  return (body:gsub("%$()", function(pos)
+    local nxt = body:sub(pos, pos)
+    if nxt:match("%d") or (nxt == "{" and body:sub(pos + 1, pos + 1):match("%d")) then
+      return "$"
+    end
+    return "\\$"
+  end))
+end
+
 -- The group the float's border actually resolves to (see the `winhighlight`
 -- below). Named once because the title padding has to match it exactly.
 local BORDER_HL = "WinSeparator"
@@ -69,7 +83,7 @@ local function load_items()
     items[#items + 1] = {
       prefix = snip.prefix or "?",
       desc = snip.description or "",
-      body = body or "",
+      body = escape_stray_dollars(body or ""),
     }
   end
   table.sort(items, function(a, b) return a.prefix < b.prefix end)
