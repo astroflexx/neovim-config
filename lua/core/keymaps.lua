@@ -12,6 +12,19 @@ map("c", "kj", "<Esc>")
 
 map("n", "<leader>q", "<cmd>qa<cr>")
 
+-- <leader>e: focus the editor from anywhere - the file tree, a terminal, a
+-- dap-ui panel. Jumps to the first normal file window in the tab.
+map("n", "<leader>e", function()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].buftype == "" and vim.bo[buf].filetype ~= "NvimTree" then
+      vim.api.nvim_set_current_win(win)
+      return
+    end
+  end
+  vim.notify("no editor window to focus", vim.log.levels.WARN)
+end)
+
 -- lsp navigation
 map("n", "<leader>gd", "<C-]>")
 map("n", "<leader>gs", "<C-w>]")

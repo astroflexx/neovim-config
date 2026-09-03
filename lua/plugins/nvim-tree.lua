@@ -7,23 +7,12 @@ return {
     lazy = false,
     keys = {
       {
-        "<leader>e",
+        "<leader>w",
         function()
-          local api = require("nvim-tree.api")
-          if vim.bo.filetype == "NvimTree" then
-            for _, win in ipairs(vim.api.nvim_list_wins()) do
-              local buf = vim.api.nvim_win_get_buf(win)
-              if vim.bo[buf].filetype ~= "NvimTree" and vim.bo[buf].buftype == "" then
-                vim.api.nvim_set_current_win(win)
-                return
-              end
-            end
-          else
-            api.tree.focus()
-          end
+          require("nvim-tree.api").tree.focus()
         end,
+        desc = "Focus / open the file tree",
       },
-      { "<leader>w", "<cmd>NvimTreeClose<cr>" },
       {
         "<leader>r",
         function()
