@@ -20,6 +20,9 @@ opt.ignorecase = true
 opt.smartcase = true
 opt.splitbelow = true
 opt.splitright = true
+-- keep the text visually put when a split (the terminal panel) opens/closes
+-- below - only the window resizes, the viewport doesn't jump
+opt.splitkeep = "screen"
 -- Don't sync all yanks/deletes with system clipboard; use "+y / "+p explicitly
 opt.undofile = true
 opt.updatetime = 250
