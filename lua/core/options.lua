@@ -20,9 +20,16 @@ opt.ignorecase = true
 opt.smartcase = true
 opt.splitbelow = true
 opt.splitright = true
--- keep the text visually put when a split (the terminal panel) opens/closes
--- below - only the window resizes, the viewport doesn't jump
-opt.splitkeep = "screen"
+-- Keep the *cursor* put when a split (the terminal panel) opens/closes below.
+--
+-- "screen" pins the topline instead, which looks right only while the cursor
+-- happens to sit in the rows the shrunken window keeps. Anywhere lower and
+-- neovim clamps the cursor up into the new viewport (line 26 -> 13 with the
+-- panel at 45%), and closing the panel does not put it back - the position is
+-- simply gone. "cursor" never moves the cursor: it leaves the viewport alone
+-- while the cursor still fits, scrolls the minimum needed when it doesn't, and
+-- scrolls back when the panel closes.
+opt.splitkeep = "cursor"
 -- Don't sync all yanks/deletes with system clipboard; use "+y / "+p explicitly
 opt.undofile = true
 opt.updatetime = 250
