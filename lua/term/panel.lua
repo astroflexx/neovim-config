@@ -17,7 +17,7 @@
 local M = {}
 
 M.ID = 1
-local HEIGHT_RATIO = 0.36
+local HEIGHT_RATIO = 0.45
 
 function M.height()
   return math.max(6, math.floor(vim.o.lines * HEIGHT_RATIO))

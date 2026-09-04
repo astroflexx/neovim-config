@@ -14,8 +14,11 @@ return {
   -- The panel keys target terminal 1 explicitly so the deck's terminals (ids
   -- 101+) never get picked up by toggleterm's "first terminal" heuristic.
   keys = {
+    -- <C-\> is the toggle from *inside* the terminal (insert mode): keeping
+    -- <leader>t out of terminal mode means Space types instantly at the shell
+    -- prompt instead of waiting `timeoutlen` for a possible <leader>t.
     { [[<C-\>]], function() require("term.panel").toggle() end, mode = { "n", "t" }, desc = "Toggle / focus terminal panel" },
-    { "<leader>t", function() require("term.panel").toggle() end, mode = { "n", "t" }, desc = "Toggle / focus terminal panel" },
+    { "<leader>t", function() require("term.panel").toggle() end, desc = "Toggle / focus terminal panel" },
     { "<leader>p", function() require("term.deck").toggle() end, desc = "Toggle terminal deck" },
     { "<leader>u", function() require("term.run").compile_and_run() end, desc = "Compile & run current C/C++ file" },
   },
