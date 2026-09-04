@@ -17,7 +17,7 @@ map("n", "<leader>q", "<cmd>qa<cr>")
 map("n", "<leader>e", function()
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local buf = vim.api.nvim_win_get_buf(win)
-    if vim.bo[buf].buftype == "" and vim.bo[buf].filetype ~= "NvimTree" then
+    if (vim.bo[buf].buftype == "" or require("core.empty_state").is_empty_buf(buf)) and vim.bo[buf].filetype ~= "NvimTree" then
       vim.api.nvim_set_current_win(win)
       return
     end
@@ -55,14 +55,16 @@ end)
 map("n", "<leader>x", function()
   local bt = vim.bo.buftype
   local ft = vim.bo.filetype
+  local empty_state = require("core.empty_state")
+
   if ft == "NvimTree" then
     require("nvim-tree.api").tree.close()
     local bufs = vim.tbl_filter(function(b)
       return vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buflisted
     end, vim.api.nvim_list_bufs())
-    if #bufs == 0 or (#bufs == 1 and vim.api.nvim_buf_get_name(bufs[1]) == "" and not vim.bo[bufs[1]].modified) then
-      vim.cmd("qa")
-    end
+    if #bufs == 0 then vim.cmd("qa") end
+  elseif empty_state.is_empty_buf(vim.api.nvim_get_current_buf()) then
+    -- nothing real to close
   elseif bt == "" then
     local tree_open = false
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -73,7 +75,10 @@ map("n", "<leader>x", function()
     end
     local buf_to_delete = vim.api.nvim_get_current_buf()
     vim.cmd("bprevious")
-    if vim.api.nvim_get_current_buf() == buf_to_delete then
+    if vim.api.nvim_get_current_buf() == buf_to_delete and not tree_open then
+      -- with the tree open, empty_state.ensure() below replaces this
+      -- window's buffer with the placeholder, so no need for a scratch
+      -- buffer here
       vim.cmd("enew")
     end
     vim.cmd("bdelete " .. buf_to_delete)
@@ -81,12 +86,11 @@ map("n", "<leader>x", function()
       return vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buflisted
     end, vim.api.nvim_list_bufs())
     local only_empty = #bufs == 0 or (#bufs == 1 and vim.api.nvim_buf_get_name(bufs[1]) == "" and not vim.bo[bufs[1]].modified)
-    if only_empty and tree_open then
-      vim.cmd("NvimTreeFocus")
-      if #bufs == 1 then vim.cmd("bdelete " .. bufs[1]) end
-    elseif only_empty then
+    if only_empty and not tree_open then
       vim.cmd("qa")
     end
+    -- if the tree is open, the empty_state autocmd fills the editor
+    -- window with a placeholder instead of letting the tree go full-width
   else
     vim.cmd("q")
   end

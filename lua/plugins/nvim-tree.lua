@@ -25,9 +25,10 @@ return {
       vim.g.nvim_tree_original_cwd = vim.fn.getcwd()
       vim.g.loaded_netrw = 1
       vim.g.loaded_netrwPlugin = 1
+      vim.g.nvim_tree_view_width = 37
       require("nvim-tree").setup({
         view = {
-          width = 37,
+          width = vim.g.nvim_tree_view_width,
         },
         filters = {
           dotfiles = true,
@@ -59,6 +60,7 @@ return {
           if directory then
             vim.cmd.cd(data.file)
             require("nvim-tree.api").tree.open()
+            require("core.empty_state").ensure()
           elseif real_file then
             require("nvim-tree.api").tree.toggle({ focus = false, find_file = true })
           end

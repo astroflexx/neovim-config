@@ -7,7 +7,7 @@
 --
 --   <leader>t / <C-\>   closed            -> open + focus
 --                       open, not focused -> focus it
---                       open, focused     -> hide it (the shell keeps running)
+--                       open, focused     -> does nothing
 --   <leader>x           kill the shell (only while focused in it)
 --
 -- toggleterm creates the split with `botright split` (full width, steals rows
@@ -54,9 +54,7 @@ function M.toggle()
   local tt = require("toggleterm.terminal")
   local term = tt.get(M.ID)
   if term and term:is_open() then
-    if term:is_focused() then
-      term:close() -- hide; the shell stays alive
-    else
+    if not term:is_focused() then
       term:focus()
       vim.schedule(function() vim.cmd("startinsert") end)
     end
