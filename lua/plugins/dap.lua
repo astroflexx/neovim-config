@@ -431,6 +431,31 @@ return {
       end
     end
 
+    -- opening / closing another window (most often the file tree via <leader>w
+    -- / <leader>x) mid-session hands columns to or steals them from the dap-ui
+    -- left panel, since nvim redistributes freed space to the neighbour and
+    -- dap-ui never re-asserts its configured size. re-pin the left column and
+    -- the bottom console to their layout sizes whenever the window set changes
+    -- while a session is live.
+    local function reassert_dapui_sizes()
+      if not dap.session() then
+        return
+      end
+      vim.schedule(function()
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+          if vim.api.nvim_win_is_valid(win) then
+            local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+            if ft == "dapui_scopes" or ft == "dapui_watches" or ft == "dapui_breakpoints" then
+              pcall(vim.api.nvim_win_set_width, win, 40)
+            elseif ft == "dapui_console" then
+              pcall(vim.api.nvim_win_set_height, win, 18)
+            end
+          end
+        end
+      end)
+    end
+    vim.api.nvim_create_autocmd({ "WinNew", "WinClosed" }, { callback = reassert_dapui_sizes })
+
     -- put the cursor back where debugging started from.
     local function restore_focus()
       if not (origin_buf and vim.api.nvim_buf_is_valid(origin_buf)) then
