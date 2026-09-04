@@ -527,10 +527,16 @@ return {
     --   <leader>o   step over
     --   <leader>b   toggle breakpoint
     --   <leader>.   clear all breakpoints
-    --   <leader>dr  restart (full: terminate -> rebuild -> fresh panels)
-    --   <leader>de  jump focus back to the editor
-    --   <leader>dv/dw/db/dt   focus the variables / expressions / breakpoints /
-    --                         terminal panel
+    --
+    -- while a session is live, these leader keys are rebound to jump between the
+    -- panels (their normal-editor meanings are restored on teardown):
+    --
+    --   <leader>v   focus the variables panel
+    --   <leader>w   focus the expressions panel
+    --   <leader>l   focus the breakpoints panel
+    --   <leader>t   focus the debug terminal
+    --   <leader>r   restart (full: terminate -> rebuild -> fresh panels)
+    --   <leader>e   jump back to the editor (global map, always available)
     --
     -- step into / out, pause, restart also live on the clickable DEBUG button
     -- bar at the top of the left panel.
@@ -550,26 +556,6 @@ return {
         end
       end
       vim.notify("debug: " .. label .. " panel isn't open", vim.log.levels.WARN)
-    end
-
-    -- jump back to the editor from any panel: prefer the buffer the session
-    -- was started from, else the first normal file window.
-    local function focus_editor()
-      if origin_buf and vim.api.nvim_buf_is_valid(origin_buf) then
-        for _, win in ipairs(vim.api.nvim_list_wins()) do
-          if vim.api.nvim_win_get_buf(win) == origin_buf then
-            vim.api.nvim_set_current_win(win)
-            return
-          end
-        end
-      end
-      for _, win in ipairs(vim.api.nvim_list_wins()) do
-        local b = vim.api.nvim_win_get_buf(win)
-        if vim.bo[b].buftype == "" and vim.bo[b].filetype ~= "NvimTree" then
-          vim.api.nvim_set_current_win(win)
-          return
-        end
-      end
     end
 
     local function has_breakpoints()
@@ -642,7 +628,7 @@ return {
     -- terminal from the old run on screen. do a real restart instead - fully
     -- terminate, let teardown close everything, then start() again (which
     -- rebuilds, reopens fresh panels and a fresh terminal).
-    map("n", "<leader>dr", function()
+    local function restart_session()
       if not dap.session() then
         status("no session to restart")
         return
@@ -653,13 +639,65 @@ return {
           start(launch_current, true) -- keep debugging the same buffer
         end)
       end)
-    end, d("restart (rebuild + fresh panels)"))
+    end
 
-    -- focus panels / jump back to the editor
-    map("n", "<leader>de", focus_editor, d("focus editor"))
-    map("n", "<leader>dv", function() focus_panel("dapui_scopes", "variables") end, d("focus variables panel"))
-    map("n", "<leader>dw", function() focus_panel("dapui_watches", "expressions") end, d("focus expressions panel"))
-    map("n", "<leader>db", function() focus_panel("dapui_breakpoints", "breakpoints") end, d("focus breakpoints panel"))
-    map("n", "<leader>dt", function() focus_panel("dapui_console", "terminal") end, d("focus debug terminal panel"))
+    --------------------------------------------------------------------------
+    -- session-scoped single-key maps
+    --
+    -- while a session is live these leader keys jump between the debug panels.
+    -- their normal-editor meanings (v: free, w: file tree, l: next buffer,
+    -- t: terminal panel, r: nvim-tree reset root) are snapshotted with maparg()
+    -- on session start and put back with mapset() on teardown - lazy.nvim's
+    -- loader stubs round-trip intact, so e.g. <leader>t still lazy-loads the
+    -- terminal once the session is over. restart() runs this cycle itself (terminate ->
+    -- init), so the guard keeps the snapshot from capturing a debug map.
+    --------------------------------------------------------------------------
+    local session_maps = {
+      v = { function() focus_panel("dapui_scopes", "variables") end, "focus variables panel" },
+      w = { function() focus_panel("dapui_watches", "expressions") end, "focus expressions panel" },
+      l = { function() focus_panel("dapui_breakpoints", "breakpoints") end, "focus breakpoints panel" },
+      t = {
+        function()
+          focus_panel("dapui_console", "terminal")
+          -- the console is a real terminal; land at the prompt ready to type
+          -- stdin instead of in normal mode halfway up the scrollback
+          if vim.bo.buftype == "terminal" then
+            vim.cmd("startinsert")
+          end
+        end,
+        "focus debug terminal",
+      },
+      r = { restart_session, "restart (rebuild + fresh panels)" },
+    }
+    local saved_maps = nil
+
+    local function install_session_maps()
+      if saved_maps then
+        return
+      end
+      saved_maps = {}
+      for key, spec in pairs(session_maps) do
+        local lhs = "<leader>" .. key
+        saved_maps[key] = vim.fn.maparg(lhs, "n", false, true)
+        map("n", lhs, spec[1], d(spec[2]))
+      end
+    end
+
+    local function restore_session_maps()
+      if not saved_maps then
+        return
+      end
+      for key, prev in pairs(saved_maps) do
+        pcall(vim.keymap.del, "n", "<leader>" .. key)
+        if not vim.tbl_isempty(prev) then
+          vim.fn.mapset("n", false, prev)
+        end
+      end
+      saved_maps = nil
+    end
+
+    dap.listeners.after.event_initialized["dap_session_maps"] = install_session_maps
+    dap.listeners.before.event_terminated["dap_session_maps"] = restore_session_maps
+    dap.listeners.before.event_exited["dap_session_maps"] = restore_session_maps
   end,
 }

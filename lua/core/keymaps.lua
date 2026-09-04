@@ -30,7 +30,8 @@ map("n", "<leader>gd", "<C-]>")
 map("n", "<leader>gs", "<C-w>]")
 map("n", "<leader>gp", "<C-w>}")
 -- debug (see lua/plugins/dap.lua): <leader>i start/stop, <leader>b breakpoint,
--- <leader>, continue, <leader>dr restart, <leader>dv/de/db/dt focus panels.
+-- <leader>, continue. mid-session, <leader>v/w/l/t focus panels and <leader>r
+-- restarts (normal meanings restored on teardown).
 -- diagnostics float on <leader>c
 map("n", "<leader>c", vim.diagnostic.open_float)
 map("n", "<leader>s", vim.lsp.buf.signature_help)
