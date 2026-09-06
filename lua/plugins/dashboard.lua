@@ -23,5 +23,26 @@ return {
         },
       },
     },
+    config = function(_, opts)
+      -- hide the terminal cursor while the dashboard is shown; it starts
+      -- at 1,0 (top-left) and looks like a stray block on the empty screen
+      local group = vim.api.nvim_create_augroup("dashboard_cursor", { clear = true })
+      vim.api.nvim_create_autocmd("FileType", {
+        group = group,
+        pattern = "snacks_dashboard",
+        callback = function(ev)
+          io.write("\27[?25l")
+          vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave", "BufDelete" }, {
+            group = group,
+            buffer = ev.buf,
+            once = true,
+            callback = function()
+              io.write("\27[?25h")
+            end,
+          })
+        end,
+      })
+      require("snacks").setup(opts)
+    end,
   },
 }
