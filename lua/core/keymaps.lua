@@ -12,6 +12,9 @@ map("c", "kj", "<Esc>")
 
 map("n", "<leader>q", "<cmd>qa<cr>")
 
+-- <leader>n: new unnamed buffer, save with :w <filename>
+map("n", "<leader>n", "<cmd>enew<cr>")
+
 -- <leader>e: focus the editor from anywhere - the file tree, a terminal, a
 -- dap-ui panel. Jumps to the first normal file window in the tab.
 map("n", "<leader>e", function()
@@ -75,6 +78,13 @@ map("n", "<leader>x", function()
       end
     end
     local buf_to_delete = vim.api.nvim_get_current_buf()
+    if vim.bo[buf_to_delete].modified then
+      local name = vim.api.nvim_buf_get_name(buf_to_delete)
+      name = name == "" and "[No Name]" or vim.fn.fnamemodify(name, ":t")
+      if not require("core.confirm").ask(" Close buffer ", '"' .. name .. '" has unsaved changes.') then
+        return
+      end
+    end
     vim.cmd("bprevious")
     if vim.api.nvim_get_current_buf() == buf_to_delete and not tree_open then
       -- with the tree open, empty_state.ensure() below replaces this
@@ -82,7 +92,7 @@ map("n", "<leader>x", function()
       -- buffer here
       vim.cmd("enew")
     end
-    vim.cmd("bdelete " .. buf_to_delete)
+    vim.cmd("bdelete! " .. buf_to_delete)
     local bufs = vim.tbl_filter(function(b)
       return vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buflisted
     end, vim.api.nvim_list_bufs())
