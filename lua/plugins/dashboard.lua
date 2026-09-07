@@ -24,12 +24,20 @@ return {
             key = "j",
             desc = "Search and open folder",
             action = "<leader>j",
+            padding = 1,
           },
-          { padding = 1 },
           {
             key = "k",
             desc = "Search and open file",
             action = "<leader>k",
+            padding = 1,
+          },
+          {
+            key = "p",
+            desc = "Open ~/problem-solving",
+            action = function()
+              require("core.open_folder").open("~/problem-solving")
+            end,
           },
           { padding = 1 },
           { section = "startup" },

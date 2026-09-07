@@ -3,7 +3,7 @@
 -- stack:
 --   nvim-dap              - the debug engine / DAP client
 --   nvim-dap-ui           - the VSCode-style panels (scopes, watches, stacks, repl)
---   nvim-dap-virtual-text - inline variable values next to the code, like VSCode
+--   nvim-dap-virtual-text - inline variable values next to the code (disabled below)
 --   mason-nvim-dap        - installs the actual debug adapter (codelldb) via mason
 --
 -- codelldb is the adapter used for C, C++ and Rust. it's the same LLDB-based
@@ -354,21 +354,12 @@ return {
       allow_without_session = true,
     })
 
+    -- inline variable annotations disabled: they injected `//  = value` mid-line
+    -- into the source and cluttered it. the Local panel already shows every
+    -- variable, so the inline copy isn't needed.
     require("nvim-dap-virtual-text").setup({
-      commented = true, -- render the inline values as trailing comments
-      -- clamp the inline annotation so a big container value doesn't stretch
-      -- a code line off the right edge of the screen.
-      display_callback = function(variable, _buf, _stackframe, _node, options)
-        local value = variable.value:gsub("%s+", " ")
-        local max = 40
-        if #value > max then
-          value = value:sub(1, max - 1) .. "…"
-        end
-        if options.virt_text_pos == "inline" then
-          return " = " .. value
-        end
-        return variable.name .. " = " .. value
-      end,
+      enabled = false,
+      enabled_commands = false,
     })
 
     --------------------------------------------------------------------------
