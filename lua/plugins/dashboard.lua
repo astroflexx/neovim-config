@@ -7,6 +7,7 @@ return {
     lazy = false,
     opts = {
       dashboard = {
+        width = 50, -- matches the header art's display width so rows align to it exactly
         preset = {
           header = [[
 ███╗   ██╗███████╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
@@ -19,7 +20,14 @@ return {
         sections = {
           { section = "header" },
           { padding = 1 },
+          {
+            key = "j",
+            desc = "Search and open folder",
+            action = "<leader>j",
+          },
+          { padding = 1 },
           { section = "startup" },
+          { padding = 6 }, -- pushes the whole block up from dead-center
         },
       },
     },

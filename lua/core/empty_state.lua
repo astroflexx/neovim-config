@@ -32,10 +32,12 @@ local function get_buf()
 end
 
 function M.is_empty_buf(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then return false end
   return vim.api.nvim_buf_get_name(buf):match(BUF_NAME .. "$") ~= nil
 end
 
 local function is_blank(buf)
+  if not vim.api.nvim_buf_is_valid(buf) then return false end
   if M.is_empty_buf(buf) then return true end
   return vim.api.nvim_buf_get_name(buf) == "" and not vim.bo[buf].modified
 end
@@ -83,7 +85,7 @@ function M.ensure()
       vim.api.nvim_win_set_buf(blank_win, placeholder)
       -- Vim's own "no buffer left" fallback leaves a throwaway [No Name]
       -- buffer behind; wipe it so it doesn't linger as a bufferline tab
-      if old_buf ~= placeholder and not M.is_empty_buf(old_buf) and vim.api.nvim_buf_get_name(old_buf) == "" then
+      if old_buf ~= placeholder and vim.api.nvim_buf_is_valid(old_buf) and not M.is_empty_buf(old_buf) and vim.api.nvim_buf_get_name(old_buf) == "" then
         pcall(vim.api.nvim_buf_delete, old_buf, { force = true })
       end
       return
