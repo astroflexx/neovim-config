@@ -73,6 +73,110 @@ local function search_and_open_folder()
     :find()
 end
 
+-- pick the window the file should land in: a normal, non-floating window
+-- that isn't nvim-tree or a terminal (mirrors empty_state's notion of the
+-- "editor" window). falls back to the current window.
+local function editor_win()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.api.nvim_win_get_config(win).relative == "" then
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].filetype ~= "NvimTree" and vim.bo[buf].buftype ~= "terminal" then
+        return win
+      end
+    end
+  end
+  return vim.api.nvim_get_current_win()
+end
+
+-- open `path`: if its buffer is already visible in a window, just focus
+-- that window; otherwise load it in the editor window (adds a bufferline
+-- tab like any freshly opened buffer)
+local function open_file(path)
+  path = vim.fn.fnamemodify(path, ":p")
+
+  local target
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_get_name(b) == path then
+      target = b
+      break
+    end
+  end
+
+  if target then
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if vim.api.nvim_win_get_buf(win) == target then
+        vim.api.nvim_set_current_win(win)
+        return
+      end
+    end
+  end
+
+  vim.api.nvim_set_current_win(editor_win())
+  vim.cmd.edit(vim.fn.fnameescape(path))
+end
+
+-- <leader>k: fuzzy-search files under the current project root and open
+-- the picked one (switching to it if it's already open)
+local function search_and_open_file()
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  local previewers = require("telescope.previewers")
+
+  local cwd = vim.fn.getcwd()
+  local fd_bin = vim.fn.executable("fd") == 1 and "fd" or "fdfind"
+
+  pickers
+    .new({}, {
+      prompt_title = "Search and Open File",
+      cwd = cwd,
+      finder = finders.new_oneshot_job({
+        fd_bin,
+        "--type", "f",
+        "--hidden",
+        "--exclude", ".git",
+        "--exclude", "node_modules",
+      }, {
+        cwd = cwd,
+        entry_maker = function(line)
+          return {
+            value = line,
+            display = line,
+            ordinal = line,
+            path = cwd .. "/" .. line,
+          }
+        end,
+      }),
+      sorter = conf.file_sorter({}),
+      -- plain cat/bat preview instead of the built-in buffer previewer,
+      -- which trips over a telescope/treesitter version mismatch
+      -- (previewers/utils.lua: ft_to_lang nil)
+      previewer = previewers.new_termopen_previewer({
+        get_command = function(entry)
+          local bat = vim.fn.executable("bat") == 1 and "bat"
+            or vim.fn.executable("batcat") == 1 and "batcat"
+          if bat then
+            return { bat, "--style=plain", "--color=always", "--paging=never", entry.path }
+          end
+          return { "cat", entry.path }
+        end,
+      }),
+      attach_mappings = function(prompt_bufnr, _)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if selection then
+            open_file(selection.path)
+          end
+        end)
+        return true
+      end,
+    })
+    :find()
+end
+
 return {
   "nvim-telescope/telescope.nvim",
   branch = "0.1.x",
@@ -82,7 +186,7 @@ return {
   },
   cmd = "Telescope",
   keys = {
-    { "<leader>k", "<cmd>Telescope find_files<cr>", desc = "Find files" },
+    { "<leader>k", search_and_open_file, desc = "Search and open file" },
     { "<leader>j", search_and_open_folder, desc = "Search and open folder" },
   },
   config = function()

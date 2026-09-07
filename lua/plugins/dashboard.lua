@@ -26,8 +26,14 @@ return {
             action = "<leader>j",
           },
           { padding = 1 },
+          {
+            key = "k",
+            desc = "Search and open file",
+            action = "<leader>k",
+          },
+          { padding = 1 },
           { section = "startup" },
-          { padding = 6 }, -- pushes the whole block up from dead-center
+          { padding = 12 }, -- pushes the whole block up from dead-center
         },
       },
     },
