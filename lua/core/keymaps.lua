@@ -85,7 +85,27 @@ map("n", "<leader>x", function()
         return
       end
     end
-    vim.cmd("bprevious")
+    -- land on the tab to the left in the bufferline (right neighbour if this
+    -- is the first tab) - :bprevious would use buffer-number order, which
+    -- doesn't match the visible tab order
+    local moved = false
+    local ok, state = pcall(require, "bufferline.state")
+    if ok and state.components then
+      local idx
+      for i, c in ipairs(state.components) do
+        if c.id == buf_to_delete then
+          idx = i
+        end
+      end
+      local neighbour = idx and (state.components[idx - 1] or state.components[idx + 1])
+      if neighbour and vim.api.nvim_buf_is_valid(neighbour.id) then
+        vim.cmd("buffer " .. neighbour.id)
+        moved = true
+      end
+    end
+    if not moved then
+      vim.cmd("bprevious")
+    end
     if vim.api.nvim_get_current_buf() == buf_to_delete and not tree_open then
       -- with the tree open, empty_state.ensure() below replaces this
       -- window's buffer with the placeholder, so no need for a scratch

@@ -30,6 +30,10 @@ opt.splitright = true
 -- while the cursor still fits, scrolls the minimum needed when it doesn't, and
 -- scrolls back when the panel closes.
 opt.splitkeep = "cursor"
+-- per-folder sessions (persistence.nvim): persist the buffer list + cwd only.
+-- the window layout is always [tree | editor] and is rebuilt by
+-- core/open_folder, so saving it would only fight the restore.
+opt.sessionoptions = "buffers,curdir,folds"
 -- Don't sync all yanks/deletes with system clipboard; use "+y / "+p explicitly
 opt.undofile = true
 opt.updatetime = 250

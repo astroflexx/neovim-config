@@ -79,11 +79,53 @@ local function editor_win()
   return vim.api.nvim_get_current_win()
 end
 
+-- drop the current buffer's bufferline tab immediately to the right of
+-- `origin_buf`. new buffers otherwise slot in by buffer number, which lands
+-- a re-listed old buffer in the middle of the row instead of next to the
+-- file you opened it from.
+local function place_tab_after(origin_buf, cur, tries)
+  local ok, state = pcall(require, "bufferline.state")
+  if not ok or not state.components then
+    return
+  end
+  local from, o
+  for i, c in ipairs(state.components) do
+    if c.id == cur then
+      from = i
+    end
+    if c.id == origin_buf then
+      o = i
+    end
+  end
+  -- bufferline rebuilds `components` on its own redraw tick, so the freshly
+  -- opened buffer may not be in the list yet - retry a couple of times.
+  if not from and (tries or 0) < 5 then
+    vim.defer_fn(function()
+      place_tab_after(origin_buf, cur, (tries or 0) + 1)
+    end, 20)
+    return
+  end
+  if not from or not o or from == o then
+    return
+  end
+  -- bufferline's move_to is a swap, not an insert, so bubble the tab one slot
+  -- at a time (move() swaps with the neighbour) until it sits just after the
+  -- origin: o - from steps right if it started left of the origin, else
+  -- from - o - 1 steps left.
+  local steps = from < o and (o - from) or -(from - o - 1)
+  local dir = steps > 0 and 1 or -1
+  local move = require("bufferline.commands").move
+  for _ = 1, math.abs(steps) do
+    pcall(move, dir)
+  end
+end
+
 -- open `path`: if its buffer is already visible in a window, just focus
--- that window; otherwise load it in the editor window (adds a bufferline
--- tab like any freshly opened buffer)
+-- that window; otherwise load it in the editor window, as a bufferline tab
+-- placed right after the buffer it was opened from
 local function open_file(path)
   path = vim.fn.fnamemodify(path, ":p")
+  local origin = vim.api.nvim_get_current_buf()
 
   local target
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
@@ -104,6 +146,12 @@ local function open_file(path)
 
   vim.api.nvim_set_current_win(editor_win())
   vim.cmd.edit(vim.fn.fnameescape(path))
+  local opened = vim.api.nvim_get_current_buf()
+  if opened ~= origin then
+    vim.schedule(function()
+      place_tab_after(origin, opened)
+    end)
+  end
 end
 
 -- <leader>k: fuzzy-search files under the current project root and open

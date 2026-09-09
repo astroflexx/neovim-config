@@ -27,6 +27,12 @@ return {
       vim.g.loaded_netrwPlugin = 1
       vim.g.nvim_tree_view_width = 37
       require("nvim-tree").setup({
+        -- `nvim <dir>` is handled by core/open_folder via the VimEnter hook
+        -- below (session restore + tree + empty state). nvim-tree must not
+        -- grab the directory buffer on startup and pre-empt it - otherwise
+        -- the hook sees nvim-tree's own buffer, not the dir path, and the
+        -- session is never restored.
+        hijack_directories = { enable = false },
         view = {
           width = vim.g.nvim_tree_view_width,
         },
@@ -58,10 +64,11 @@ return {
           local directory = vim.fn.isdirectory(data.file) == 1
           local real_file = vim.fn.filereadable(data.file) == 1
           if directory then
-            vim.cmd.cd(data.file)
-            require("nvim-tree.api").tree.open()
-            require("core.empty_state").ensure()
+            -- `nvim <dir>`: open it as the project root, restoring its
+            -- saved session if there is one (see core/open_folder).
+            require("core.open_folder").open(data.file)
           elseif real_file then
+            require("core.open_folder").current = vim.fn.getcwd()
             require("nvim-tree.api").tree.toggle({ focus = false, find_file = true })
           end
         end,

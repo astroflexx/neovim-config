@@ -62,24 +62,34 @@ return {
     fix_bufferline_hls()
 
     local map = vim.keymap.set
-    local function listed_bufs()
-      local bufs = {}
-      for _, b in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.bo[b].buflisted then bufs[#bufs + 1] = b end
+
+    -- current buffer's index in the *visible* tab order (which can differ
+    -- from buffer-number order after a tab is moved), plus the tab count.
+    -- used to stop h/l from wrapping past the ends.
+    local function tab_pos()
+      local ok, state = pcall(require, "bufferline.state")
+      if not ok or not state.components then
+        return nil, nil
       end
-      return bufs
+      local cur = vim.api.nvim_get_current_buf()
+      for i, c in ipairs(state.components) do
+        if c.id == cur then
+          return i, #state.components
+        end
+      end
+      return nil, #state.components
     end
 
     map("n", "<leader>h", function()
-      local bufs = listed_bufs()
-      if vim.api.nvim_get_current_buf() ~= bufs[1] then
+      local i = tab_pos()
+      if not i or i > 1 then
         vim.cmd("BufferLineCyclePrev")
       end
     end, { desc = "Previous buffer" })
 
     map("n", "<leader>l", function()
-      local bufs = listed_bufs()
-      if vim.api.nvim_get_current_buf() ~= bufs[#bufs] then
+      local i, n = tab_pos()
+      if not i or i < n then
         vim.cmd("BufferLineCycleNext")
       end
     end, { desc = "Next buffer" })
