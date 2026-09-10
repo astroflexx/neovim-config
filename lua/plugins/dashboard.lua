@@ -38,6 +38,12 @@ return {
             action = function()
               require("core.open_folder").open("~/problem-solving")
             end,
+            padding = 1,
+          },
+          {
+            key = "q",
+            desc = "Quit",
+            action = ":qa",
           },
           { padding = 1 },
           { section = "startup" },
@@ -66,6 +72,25 @@ return {
         callback = function(ev)
           if vim.bo[ev.buf].filetype == "snacks_dashboard" then
             io.write("\27[?25h")
+          end
+        end,
+      })
+
+      -- disable mouse-wheel scrolling on the dashboard only; the header/menu
+      -- is meant to stay fixed, unlike normal buffers which keep scrolling
+      vim.api.nvim_create_autocmd("FileType", {
+        group = group,
+        pattern = "snacks_dashboard",
+        callback = function(ev)
+          for _, wheel in ipairs({
+            "<ScrollWheelUp>",
+            "<ScrollWheelDown>",
+            "<S-ScrollWheelUp>",
+            "<S-ScrollWheelDown>",
+            "<C-ScrollWheelUp>",
+            "<C-ScrollWheelDown>",
+          }) do
+            vim.keymap.set({ "n", "i", "v" }, wheel, "<Nop>", { buffer = ev.buf })
           end
         end,
       })
