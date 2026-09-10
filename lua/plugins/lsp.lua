@@ -32,12 +32,14 @@ return {
 
     local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
-    -- Tell every server "I don't support snippets", so completion items come
-    -- back as plain text instead of placeholder templates. This is what turns
-    -- clangd's `vector<${1:typename Tp}>` (the `vector~` template entry in the
-    -- menu) into a plain `vector` that just inserts the identifier, matching
-    -- VSCode's default C++ IntelliSense behaviour.
-    capabilities.textDocument.completion.completionItem.snippetSupport = false
+    -- Snippet support has to stay on: clangd only offers its keyword-pattern
+    -- completions for control-flow statements (`for`, `while`, `do`, ...) when
+    -- the client claims snippet support -- a bare "for" with no placeholders
+    -- for the loop header wouldn't be useful, so clangd skips the item
+    -- entirely otherwise. This also lets template-y entries like
+    -- `vector<${1:typename Tp}>~` back in; cmp.lua's lsp_entry_filter strips
+    -- those placeholders back down to a plain `vector` insert.
+    capabilities.textDocument.completion.completionItem.snippetSupport = true
 
     -- mason-lspconfig 2.x has no `handlers` / `setup_handlers`: it just calls
     -- `vim.lsp.enable()` for every installed server, pulling per-server config
@@ -48,8 +50,8 @@ return {
       capabilities = capabilities,
       cmd = {
         "clangd",
-        -- Don't insert `(` / argument placeholders when completing a function;
-        -- just the name. Belt-and-braces with snippetSupport=false.
+        -- Don't insert argument placeholders when completing a function call
+        -- (still inserts the `()`, just no `${1:arg}` snippet stops inside).
         "--function-arg-placeholders=false",
         -- Never auto-add `#include` lines on completion; headers are added by hand.
         "--header-insertion=never",

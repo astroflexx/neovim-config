@@ -12,6 +12,65 @@ return {
     local compare = require("cmp.config.compare")
     local lspkind = require("lspkind")
     local KIND = require("cmp.types").lsp.CompletionItemKind
+    local INSERT_FORMAT = require("cmp.types").lsp.InsertTextFormat
+
+    -- snippetSupport is left on in lsp.lua only because clangd refuses to
+    -- even generate `for`/`while`/`do`/... completions when the client
+    -- claims no snippet support (a bare "for" with no placeholders isn't
+    -- worth sending server-side). But this config wants zero snippet
+    -- behaviour: completion should always just insert the bare word --
+    -- keyword, identifier, type name, whatever -- and nothing more. So strip
+    -- every Snippet-format item back down to plain text (`vector<${1:...}>`
+    -- -> plain `vector`, `for (${1:...}; ...) {\n$0\n}` -> plain `for`) right
+    -- on the raw LSP response, before nvim-cmp ever builds an Entry from it.
+    -- Entry caches its insert text once at construction (cmp/entry.lua
+    -- `self.word = self:_get_word()`), so doing this later via
+    -- `sources.nvim_lsp.entry_filter` -- which only runs after entries
+    -- already exist -- edits a table nothing reads any more; it has to
+    -- happen here instead. clangd also sends classic and range-based `for`
+    -- as two separate snippet items that both collapse to the same plain
+    -- "for" text, so dedupe per response too.
+    local ok_lsp_source, lsp_source = pcall(require, "cmp_nvim_lsp.source")
+    if ok_lsp_source and not lsp_source._strip_snippets_patched then
+      lsp_source._strip_snippets_patched = true
+      local orig_complete = lsp_source.complete
+      lsp_source.complete = function(self, params, callback)
+        orig_complete(self, params, function(response)
+          if response then
+            local items = response.items or response
+            local seen = {}
+            local kept = {}
+            for _, item in ipairs(items) do
+              local skip = false
+              if item.insertTextFormat == INSERT_FORMAT.Snippet then
+                local plain = (item.label or ""):gsub("^%s+", ""):gsub("~$", "")
+                item.insertTextFormat = INSERT_FORMAT.PlainText
+                item.label = plain
+                item.insertText = plain
+                item.filterText = plain
+                if item.textEdit then
+                  item.textEdit.newText = plain
+                end
+                if seen[plain] then
+                  skip = true
+                else
+                  seen[plain] = true
+                end
+              end
+              if not skip then
+                kept[#kept + 1] = item
+              end
+            end
+            if response.items then
+              response.items = kept
+            else
+              response = kept
+            end
+          end
+          callback(response)
+        end)
+      end
+    end
 
     -- Keep the LSP menu predictable: for a given prefix it should always show
     -- the same rows. clangd (with <bits/stdc++.h> in scope) also offers
