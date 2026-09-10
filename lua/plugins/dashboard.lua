@@ -46,22 +46,27 @@ return {
       },
     },
     config = function(_, opts)
-      -- hide the terminal cursor while the dashboard is shown; it starts
-      -- at 1,0 (top-left) and looks like a stray block on the empty screen
+      -- hide the terminal cursor while the dashboard is focused; it starts
+      -- at 1,0 (top-left) and looks like a stray block on the empty screen.
+      -- hide/show on every enter/leave (not one-shot) so it stays hidden
+      -- after round-tripping through a picker (e.g. <leader>j then <leader>x)
       local group = vim.api.nvim_create_augroup("dashboard_cursor", { clear = true })
-      vim.api.nvim_create_autocmd("FileType", {
+      vim.api.nvim_create_autocmd({ "FileType", "BufEnter", "BufWinEnter" }, {
         group = group,
-        pattern = "snacks_dashboard",
+        pattern = "*",
         callback = function(ev)
-          io.write("\27[?25l")
-          vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave", "BufDelete" }, {
-            group = group,
-            buffer = ev.buf,
-            once = true,
-            callback = function()
-              io.write("\27[?25h")
-            end,
-          })
+          if vim.bo[ev.buf].filetype == "snacks_dashboard" then
+            io.write("\27[?25l")
+          end
+        end,
+      })
+      vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave", "BufDelete" }, {
+        group = group,
+        pattern = "*",
+        callback = function(ev)
+          if vim.bo[ev.buf].filetype == "snacks_dashboard" then
+            io.write("\27[?25h")
+          end
         end,
       })
       require("snacks").setup(opts)
