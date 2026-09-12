@@ -100,6 +100,24 @@ return {
       return s .. string.rep(" ", width - #s)
     end
 
+    -- lspkind's icons are multi-byte UTF-8 glyphs whose *display* width
+    -- (1 or 2 terminal cells) doesn't match their byte length, and it varies
+    -- icon to icon (a Class icon may render 1 cell, an Interface icon 2).
+    -- nvim-cmp auto-pads the gap between the `kind` and `abbr` fields based
+    -- on each row's measured width, so an icon that renders narrower than
+    -- another gets *more* filler space and one that renders wider gets
+    -- *less* -- the name column then starts at a different screen column
+    -- per row. Padding every icon to the same strdisplaywidth here means
+    -- cmp always measures the same width and adds the same filler, so the
+    -- name column lines up regardless of which icon glyph is used.
+    local function fixed_display_width(s, width)
+      local w = vim.fn.strdisplaywidth(s)
+      if w >= width then
+        return s
+      end
+      return s .. string.rep(" ", width - w)
+    end
+
     cmp.setup({
       -- The <leader>a snippet picker (lua/core/snippets.lua) is a plain insert-
       -- mode buffer; cmp must stay completely off it -- both the automatic menu
@@ -207,7 +225,8 @@ return {
           end
 
           local kind_text = vim_item.kind
-          vim_item.kind = " " .. (lspkind.symbol_map[vim_item.kind] or "")
+          local icon = lspkind.symbol_map[vim_item.kind] or ""
+          vim_item.kind = " " .. fixed_display_width(icon, 2)
 
           local detail = entry.completion_item.detail
           if detail and detail ~= "" then
@@ -223,9 +242,12 @@ return {
           local max_name = 18
           local max_detail = 18
 
-          if #name > max_name then
-            name = name:sub(1, max_name - 3) .. "..."
-          end
+          -- name is padded/truncated to a fixed width first, so it never
+          -- shifts the start of the gap. detail is truncated to its own max,
+          -- then the gap is whatever's left so detail's last char always
+          -- lands on column `total` -- i.e. detail stays right-aligned at a
+          -- fixed position, and every abbr string is exactly `total` chars.
+          name = fixed_width(name, max_name)
           if #detail > max_detail then
             detail = detail:sub(1, max_detail - 3) .. "..."
           end
