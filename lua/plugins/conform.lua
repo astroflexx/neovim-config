@@ -8,6 +8,7 @@ return {
     formatters_by_ft = {
       cpp = { "clang-format" },
       c = { "clang-format" },
+      go = { "goimports" },
     },
   },
 }

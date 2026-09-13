@@ -1,11 +1,12 @@
 return {
   "mfussenegger/nvim-lint",
-  ft = { "cpp", "c" },
+  ft = { "cpp", "c", "go" },
   config = function()
     local lint = require("lint")
     lint.linters_by_ft = {
       cpp = { "cpplint" },
       c = { "cpplint" },
+      go = { "golangcilint" },
     }
     vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost" }, {
       callback = function()
