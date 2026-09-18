@@ -8,11 +8,11 @@ return {
       c = { "cpplint" },
       go = { "golangcilint" },
     }
+    lint.linters.golangcilint.ignore_exitcode = true
+    local lint_exclude = require("core.lint_exclude")
     vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost" }, {
-      callback = function()
-        local filepath = vim.fn.expand("%:p")
-        local home = vim.fn.expand("$HOME")
-        if filepath:find(home .. "/test", 1, true) or filepath:find(home .. "/problem-solving", 1, true) then
+      callback = function(args)
+        if lint_exclude.is_excluded(args.buf) then
           return
         end
         lint.try_lint()

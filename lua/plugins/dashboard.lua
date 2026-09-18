@@ -33,6 +33,17 @@ return {
             padding = 1,
           },
           {
+            key = "n",
+            desc = "New scratch file",
+            action = function()
+              vim.cmd("enew")
+              vim.b.keep_blank = true
+              require("core.open_folder").current = vim.fn.getcwd()
+              require("nvim-tree.api").tree.toggle({ focus = false, find_file = false })
+            end,
+            padding = 1,
+          },
+          {
             key = "p",
             desc = "Open ~/problem-solving",
             action = function()

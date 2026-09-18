@@ -23,3 +23,6 @@ vim.api.nvim_create_autocmd("BufReadPost", {
 -- keep a placeholder editor window open next to nvim-tree so the tree
 -- never expands to fill the whole screen when no buffers are open
 require("core.empty_state").setup()
+
+-- auto-clear command-line messages a few seconds after they stop changing
+require("core.msg_timeout").setup()

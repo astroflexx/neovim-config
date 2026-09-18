@@ -19,11 +19,13 @@ local MODE_MAP = {
 
 local teal = "#1a8a7a"
 local green = "#45b550"
+local cyan = "#3ab5c9"
 local stl_bg = "#1e1f20"
 
 local sep_l = "\u{e0b6}"
 local icon_fmt = "\u{f0c9}"
 local icon_lsp = "\u{f013}"
+local icon_lint = "\u{f188}"
 
 local function setup_highlights()
   vim.api.nvim_set_hl(0, "StatusLine", { fg = "#9a9a9a", bg = stl_bg })
@@ -35,6 +37,9 @@ local function setup_highlights()
 
   vim.api.nvim_set_hl(0, "StLspSep", { fg = green, bg = stl_bg })
   vim.api.nvim_set_hl(0, "StLspBody", { fg = "#000000", bg = green, bold = true })
+
+  vim.api.nvim_set_hl(0, "StLintSep", { fg = cyan, bg = stl_bg })
+  vim.api.nvim_set_hl(0, "StLintBody", { fg = "#000000", bg = cyan, bold = true })
 
   vim.api.nvim_set_hl(0, "StFmtToLsp", { fg = green, bg = teal })
 end
@@ -76,6 +81,16 @@ local function get_lsp_info(buf)
   return table.concat(names, ", ")
 end
 
+local function get_linter_info(buf)
+  if require("core.lint_exclude").is_excluded(buf) then return nil end
+  local ok, lint = pcall(require, "lint")
+  if not ok then return nil end
+  local ft = vim.bo[buf].filetype
+  local names = lint.linters_by_ft[ft]
+  if not names or #names == 0 then return nil end
+  return table.concat(names, ", ")
+end
+
 function M.render()
   local buf = find_editor_buf()
 
@@ -84,6 +99,8 @@ function M.render()
   local sections = {}
   local fmt = get_formatter_info(buf)
   if fmt then sections[#sections + 1] = { body = "StFmtBody", sep = "StFmtSep", icon = icon_fmt, text = fmt, color = "Fmt" } end
+  local lint = get_linter_info(buf)
+  if lint then sections[#sections + 1] = { body = "StLintBody", sep = "StLintSep", icon = icon_lint, text = lint, color = "Lint" } end
   local lsp = get_lsp_info(buf)
   if lsp then sections[#sections + 1] = { body = "StLspBody", sep = "StLspSep", icon = icon_lsp, text = lsp, color = "Lsp" } end
 

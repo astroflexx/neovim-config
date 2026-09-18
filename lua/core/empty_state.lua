@@ -39,6 +39,7 @@ end
 local function is_blank(buf)
   if not vim.api.nvim_buf_is_valid(buf) then return false end
   if M.is_empty_buf(buf) then return true end
+  if vim.b[buf].keep_blank then return false end
   return vim.api.nvim_buf_get_name(buf) == "" and not vim.bo[buf].modified
 end
 
