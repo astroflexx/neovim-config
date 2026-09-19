@@ -39,6 +39,9 @@ return {
         filters = {
           dotfiles = true,
         },
+        git = {
+          enable = false,
+        },
       })
 
       local original_guicursor = vim.o.guicursor

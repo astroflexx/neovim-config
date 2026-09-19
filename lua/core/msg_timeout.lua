@@ -11,6 +11,18 @@ local POLL_MS = 500
 local last_msg = ""
 local last_change = vim.uv.now()
 
+-- only actually typing a ":" command is unsafe to clear over; insert/visual/
+-- normal are all fine, and if we do land on "c" we just retry shortly after
+-- instead of giving up on the clear entirely
+local function clear_msg(on_done)
+  if vim.api.nvim_get_mode().mode == "c" then
+    vim.defer_fn(function() clear_msg(on_done) end, 200)
+    return
+  end
+  vim.api.nvim_echo({ { "", "" } }, false, {})
+  if on_done then on_done() end
+end
+
 local function tick()
   local msg = vim.v.statusmsg or ""
   if msg ~= last_msg then
@@ -21,11 +33,11 @@ local function tick()
 
   if msg == "" then return end
   if vim.uv.now() - last_change < TIMEOUT_MS then return end
-  if vim.api.nvim_get_mode().mode ~= "n" then return end
 
-  vim.api.nvim_echo({ { "", "" } }, false, {})
-  vim.v.statusmsg = ""
-  last_msg = ""
+  clear_msg(function()
+    vim.v.statusmsg = ""
+    last_msg = ""
+  end)
 end
 
 -- vim.notify (used by nvim-tree and other plugins) goes through nvim_echo
@@ -42,8 +54,7 @@ local function wrap_notify()
     local my_generation = generation
     vim.defer_fn(function()
       if my_generation ~= generation then return end
-      if vim.api.nvim_get_mode().mode ~= "n" then return end
-      vim.api.nvim_echo({ { "", "" } }, false, {})
+      clear_msg()
     end, TIMEOUT_MS)
   end
 end

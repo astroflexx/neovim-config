@@ -56,6 +56,19 @@ map("n", "<leader>y", function()
   local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":t")
   vim.notify(string.format("yanked %d line%s from %s", lines, lines == 1 and "" or "s", name))
 end)
+-- <C-c> in visual/select (keyboard or mouse selection): copy to the system
+-- clipboard, leave visual mode and show how much was copied
+map({ "x", "s" }, "<C-c>", function()
+  local mode = vim.fn.mode()
+  local n = math.abs(vim.fn.line("v") - vim.fn.line(".")) + 1
+  local chars = #table.concat(vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = mode }), "\n")
+  vim.cmd('normal! "+y')
+  local what = mode == "V" and string.format("%d line%s", n, n == 1 and "" or "s")
+    or mode == "\22" and "block"
+    or string.format("%d char%s", chars, chars == 1 and "" or "s")
+  vim.notify("copied " .. what .. " to clipboard")
+end)
+
 map("n", "<leader>x", function()
   local bt = vim.bo.buftype
   local ft = vim.bo.filetype
