@@ -5,6 +5,10 @@ vim.g.maplocalleader = " "
 
 local map = vim.keymap.set
 
+-- mouse selections auto-scroll down past the bottom of a window; this gives
+-- them the same thing going up
+require("core.drag_scroll").setup()
+
 -- use "kj" to switch from any mode to normal mode
 map("i", "kj", "<Esc>")
 map("v", "kj", "<Esc>")
