@@ -16,7 +16,9 @@
 --   * type on the top line to fuzzy-filter the list below
 --   * <CR> inserts the selected snippet -- the first row, unless you have moved
 --     the cursor onto another one
---   * `kj` leaves insert mode (as everywhere), then j/k move the selection
+--   * `kj` leaves insert mode (as everywhere), then j/k move the selection;
+--     i/a/I/A/o/O from a list row jump back to the end of the query, like a
+--     terminal prompt
 --   * <leader>x dismisses it, like any other buffer
 --
 -- Expansion runs through vim.snippet (already the engine wired in cmp.lua), so
@@ -273,6 +275,26 @@ function M.open()
   end
   for _, lhs in ipairs({ "cc", "C", "S" }) do
     vim.keymap.set("n", lhs, function() clear_query(true) end, kopts)
+  end
+
+  -- Like a terminal prompt: from a list row, every insert key goes back to the
+  -- end of the query. On the query line itself i/a/I/A keep their usual
+  -- meaning; o/O would open a line under/over it, so they also go to the end.
+  local function to_query_end()
+    vim.api.nvim_win_set_cursor(win, { 1, 0 })
+    vim.cmd.startinsert({ bang = true })
+  end
+  for _, lhs in ipairs({ "i", "a", "I", "A" }) do
+    vim.keymap.set("n", lhs, function()
+      if vim.api.nvim_win_get_cursor(win)[1] == 1 then
+        vim.api.nvim_feedkeys(lhs, "n", false)
+      else
+        to_query_end()
+      end
+    end, kopts)
+  end
+  for _, lhs in ipairs({ "o", "O" }) do
+    vim.keymap.set("n", lhs, to_query_end, kopts)
   end
 
   local grp = vim.api.nvim_create_augroup("algo_snippets_" .. buf, { clear = true })
