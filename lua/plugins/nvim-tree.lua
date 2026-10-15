@@ -33,6 +33,19 @@ return {
         -- the hook sees nvim-tree's own buffer, not the dir path, and the
         -- session is never restored.
         hijack_directories = { enable = false },
+        -- `d` sends to the system trash (`gio trash`, restorable from the
+        -- file manager's Trash) instead of nvim-tree's default hard delete.
+        on_attach = function(bufnr)
+          local api = require("nvim-tree.api")
+          api.config.mappings.default_on_attach(bufnr)
+          vim.keymap.set({ "n", "x" }, "d", api.fs.trash, {
+            desc = "nvim-tree: Trash",
+            buffer = bufnr,
+            noremap = true,
+            silent = true,
+            nowait = true,
+          })
+        end,
         view = {
           width = vim.g.nvim_tree_view_width,
         },
