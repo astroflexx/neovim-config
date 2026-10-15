@@ -57,6 +57,9 @@ return {
       local sel_bg = vim.api.nvim_get_hl(0, { name = "BufferLineBufferSelected" }).bg
       local sel_fg = vim.api.nvim_get_hl(0, { name = "BufferLineBufferSelected" }).fg
       vim.api.nvim_set_hl(0, "BufferLineBufferSelected", { fg = sel_fg, bg = sel_bg, italic = false, bold = false })
+      -- the "repository/" prefix bufferline adds to same-named files; match the
+      -- filename instead of the theme's green italic
+      vim.api.nvim_set_hl(0, "BufferLineDuplicateSelected", { fg = sel_fg, bg = sel_bg, italic = false, bold = false })
     end
 
     fix_bufferline_hls()
