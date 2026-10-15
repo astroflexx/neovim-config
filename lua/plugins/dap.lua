@@ -422,7 +422,7 @@ return {
       end
     end
 
-    -- opening / closing another window (most often the file tree via <leader>w
+    -- opening / closing another window (most often the file tree via <leader>d
     -- / <leader>x) mid-session hands columns to or steals them from the dap-ui
     -- left panel, since nvim redistributes freed space to the neighbour and
     -- dap-ui never re-asserts its configured size. re-pin the left column and
@@ -636,7 +636,7 @@ return {
     -- session-scoped single-key maps
     --
     -- while a session is live these leader keys jump between the debug panels.
-    -- their normal-editor meanings (v: free, w: file tree, l: next buffer,
+    -- their normal-editor meanings (v: free, w: free, l: next buffer,
     -- t: terminal panel, r: nvim-tree reset root) are snapshotted with maparg()
     -- on session start and put back with mapset() on teardown - lazy.nvim's
     -- loader stubs round-trip intact, so e.g. <leader>t still lazy-loads the

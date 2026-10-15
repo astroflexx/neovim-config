@@ -7,7 +7,7 @@ return {
     lazy = false,
     keys = {
       {
-        "<leader>w",
+        "<leader>d",
         function()
           require("nvim-tree.api").tree.focus()
         end,
