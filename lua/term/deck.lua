@@ -45,12 +45,15 @@ define_hls()
 -- resize), so this is re-applied from on_open and from a VimResized handler.
 local function render_title(win)
   if not win or not vim.api.nvim_win_is_valid(win) then return end
-  local chunks = {}
+  -- one blank cell of padding at each end and between every pill
+  local chunks = { { " ", "TermDeckTab" } }
   for i = 1, #tabs do
     chunks[#chunks + 1] = { (" %d "):format(i), i == current and "TermDeckTabSel" or "TermDeckTab" }
+    chunks[#chunks + 1] = { " ", "TermDeckTab" }
   end
-  chunks[#chunks + 1] = { "  ", "TermDeckTab" }
+  -- "new tab": padded to the same 3-cell width as a tab pill
   chunks[#chunks + 1] = { " + ", "TermDeckTabNew" }
+  chunks[#chunks + 1] = { " ", "TermDeckTab" }
   pcall(vim.api.nvim_win_set_config, win, { title = chunks, title_pos = "center" })
 end
 
@@ -75,12 +78,16 @@ end
 
 local function new_term()
   next_id = next_id + 1
-  return require("toggleterm.terminal").Terminal:new({
+  local term = require("toggleterm.terminal").Terminal:new({
     id = next_id,
     direction = "float",
     -- kept out of toggleterm's own toggle/list heuristics; the deck drives
     -- these terminals directly by object reference.
     hidden = true,
+    -- auto_scroll does `normal! G` on every output while in normal mode, which
+    -- yanks the cursor off the prompt to the blank last line (e.g. when a new
+    -- shell's first prompt arrives after show() has dropped to normal mode).
+    auto_scroll = false,
     -- explicit centred geometry: without row/col the panel's bottom-strip
     -- coordinates would leak in through toggleterm's config merge.
     float_opts = {
@@ -96,11 +103,33 @@ local function new_term()
       set_keymaps(t.bufnr)
       render_title(t.window)
     end,
+    on_stdout = function(t)
+      if not t.__awaiting_prompt then return end
+      t.__awaiting_prompt = false
+      local cb = t.__to_normal
+      t.__to_normal = nil
+      -- brief pause so a prompt that arrives in several chunks is complete
+      if cb then vim.defer_fn(cb, 30) end
+    end,
     on_exit = function(t)
       if t.__deck_killed then return end -- close_tab already did the bookkeeping
       M._forget(t)
     end,
   })
+  term.__awaiting_prompt = true
+  return term
+end
+
+-- Land in normal mode (`a`/`i` to type). toggleterm's start_in_insert is
+-- global and the panel wants it, so undo it here, after both its spawn-time
+-- startinsert and its scheduled TermEnter one. Go *through* terminal mode
+-- and leave with a real <C-\><C-n> rather than :stopinsert: only that exit
+-- puts the cursor on the shell's cursor (the prompt) instead of leaving it
+-- on the last buffer line where toggleterm parked it.
+local function to_normal(t)
+  if tabs[current] ~= t or not t:is_focused() then return end
+  vim.cmd("startinsert")
+  vim.api.nvim_feedkeys(vim.keycode([[<C-\><C-n>]]), "n", false)
 end
 
 -- Show tab `idx`, hiding whichever tab is currently on screen.
@@ -116,6 +145,14 @@ local function show(idx)
     render_title(t.window)
   else
     t:open() -- fires on_open -> render_title
+  end
+  -- Land in normal mode (see to_normal). A brand-new shell hasn't drawn its
+  -- prompt yet, so leaving now would put the cursor at column 0; on_stdout
+  -- calls this once the prompt arrives.
+  if t.__awaiting_prompt then
+    t.__to_normal = function() to_normal(t) end
+  else
+    vim.schedule(function() to_normal(t) end)
   end
 end
 
