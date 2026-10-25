@@ -108,6 +108,7 @@ function M.open(dir)
   pcall(function()
     require("nvim-tree.api").tree.open()
     require("nvim-tree.api").tree.change_root(dir)
+    require("core.tree_state").restore() -- expanded folders + H toggle
   end)
   require("core.empty_state").ensure() -- no-op when a session restored buffers
 

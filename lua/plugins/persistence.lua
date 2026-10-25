@@ -18,10 +18,12 @@ return {
 
     -- persistence's own exit save (and any manual save) goes through mksession,
     -- which records the window layout. drop the tree first so the session is
-    -- just the editor window + its buffers.
+    -- just the editor window + its buffers; its expanded folders / H toggle
+    -- go to a sidecar file instead (core/tree_state).
     vim.api.nvim_create_autocmd("User", {
       pattern = "PersistenceSavePre",
       callback = function()
+        require("core.tree_state").save()
         pcall(function()
           require("nvim-tree.api").tree.close()
         end)
